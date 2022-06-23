@@ -43,6 +43,7 @@ import {LendingPoolStorage} from './LendingPoolStorage.sol';
  *   LendingPoolAddressesProvider
  * @author Aave
  **/
+
 contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage {
   using SafeMath for uint256;
   using WadRayMath for uint256;
@@ -176,6 +177,7 @@ contract LendingPool is VersionedInitializable, ILendingPool, LendingPoolStorage
       emit ReserveUsedAsCollateralDisabled(asset, msg.sender);
     }
 
+    // NOTE (Gary): transfer asset operation is in this burn function
     IAToken(aToken).burn(msg.sender, to, amountToWithdraw, reserve.liquidityIndex);
 
     emit Withdraw(asset, msg.sender, to, amountToWithdraw);
