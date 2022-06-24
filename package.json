@@ -1,5 +1,5 @@
 {
-  "name": "hardhat-project",
+  "name": "keep-finance",
   "dependencies": {
     "@chainlink/contracts": "^0.4.1",
     "@nomiclabs/hardhat-waffle": "^2.0.3",
