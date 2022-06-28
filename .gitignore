@@ -1,9 +1,6 @@
-node_modules
+node_modules/
 .env
-coverage
-coverage.json
-typechain
-.vscode
+.vscode/
 hardhat.config.js
 package-lock.json
 
