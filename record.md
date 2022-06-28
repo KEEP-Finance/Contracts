@@ -58,12 +58,3 @@
 
         - NOTE: we need to tackle situations where the user's remaining asset is negative (Insurance Fund, later implement)
     
-## Prizes
-
-1. 1inch
-
-2. Wallet
-
-3. Polygon
-
-4. 
