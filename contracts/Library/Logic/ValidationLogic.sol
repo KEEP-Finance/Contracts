@@ -23,10 +23,10 @@ library ValidationLogic {
     DataTypes.ReserveData storage marginReserve,
     DataTypes.ReserveData storage borrowedReserve,
     DataTypes.ReserveData storage heldReserve,
-    uint256 marginAmount,
-    uint256 amountToBorrow
+    uint256 collateralAmount,
+    uint256 amountToShort
   ) external view {
-    require(marginAmount != 0, Errors.GetError(Errors.Error.VL_INVALID_AMOUNT));
+    require(collateralAmount != 0, Errors.GetError(Errors.Error.VL_INVALID_AMOUNT));
     require(marginReserve.configuration.active, Errors.GetError(Errors.Error.VL_NO_ACTIVE_RESERVE));
     require(!marginReserve.configuration.frozen, Errors.GetError(Errors.Error.VL_RESERVE_FROZEN));
 
@@ -35,7 +35,7 @@ library ValidationLogic {
 
     require(borrowedReserve.configuration.active, Errors.GetError(Errors.Error.VL_NO_ACTIVE_RESERVE));
     require(!borrowedReserve.configuration.frozen, Errors.GetError(Errors.Error.VL_RESERVE_FROZEN));
-    require(amountToBorrow != 0, Errors.GetError(Errors.Error.VL_INVALID_AMOUNT));
+    require(amountToShort != 0, Errors.GetError(Errors.Error.VL_INVALID_AMOUNT));
     require(borrowedReserve.configuration.borrowingEnabled, Errors.GetError(Errors.Error.VL_BORROWING_NOT_ENABLED));
   }
 

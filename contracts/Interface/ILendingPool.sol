@@ -132,10 +132,10 @@ interface ILendingPool {
 
   event OpenPosition(
     address trader,
-    address marginTokenAddress,
-    address borrowedTokenAddress,
-    uint256 marginAmount,
-    uint256 borrowedAmount,
+    address collateralTokenAddress,
+    address shortTokenAddress,
+    uint256 collateralAmount,
+    uint256 shortAmount,
     uint256 liquidationThreshold,
     uint id
   );
@@ -143,20 +143,20 @@ interface ILendingPool {
   event ClosePosition(
     uint256 id,
     address traderAddress,
-    address marginTokenAddress,
-    uint256 marginAmount,
-    address borrowedTokenAddress,
-    uint256 borrowedAmount
+    address collateralTokenAddress,
+    uint256 collateralAmount,
+    address shortTokenAddress,
+    uint256 shortAmount
   );
 
   event PositionLiquidated(
     uint256 id,
     address liquidator,
     address traderAddress,
-    address marginTokenAddress,
-    uint256 marginAmount,
-    address borrowedTokenAddress,
-    uint256 borrowedAmount
+    address collateralTokenAddress,
+    uint256 collateralAmount,
+    address shortTokenAddress,
+    uint256 shortAmount
   );
 
   function finalizeTransfer(

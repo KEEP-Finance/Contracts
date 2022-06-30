@@ -734,16 +734,16 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
    * @dev Open a position, supply margin and borrow from pool. Traders should 
    * approve pools at first for the transfer of their assets
    * @param marginAsset The address of asset the trader supply as margin
-   * @param borrowedAsset The address of asset the trader would like to borrow at a leverage
-   * @param heldAsset The address of asset the pool will hold after swap
-   * @param marginAmount The amount of margin the trader transfers in margin decimals
+   * @param shortAsset The address of asset the trader would like to borrow at a leverage
+   * @param longAsset The address of asset the pool will hold after swap
+   * @param collateralAmount The amount of margin the trader transfers in margin decimals
    * @param leverage The leverage specified by user in ray
    **/
   function openPosition(
     address marginAsset,
-    address borrowedAsset,
-    address heldAsset,
-    uint256 marginAmount,
+    address shortAsset,
+    address longAsset,
+    uint256 collateralAmount,
     uint256 leverage,
     IAggregationRouterV4.SwapDescription memory desc,
     bytes calldata data
@@ -753,35 +753,35 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
   returns (
     DataTypes.TraderPosition memory position
   ) {
-    require(borrowedAsset != heldAsset, Errors.GetError(Errors.Error.LP_POSITION_INVALID));
+    require(shortAsset != longAsset, Errors.GetError(Errors.Error.LP_POSITION_INVALID));
     require((leverage < _maximumLeverage) && (leverage > 10**27), Errors.GetError(Errors.Error.LP_LEVERAGE_INVALID));
 
-    DataTypes.ReserveData storage borrowedReserve = _reserves[borrowedAsset];
+    DataTypes.ReserveData storage borrowedReserve = _reserves[shortAsset];
 
-    uint256 supplyTokenAmount = marginAmount.rayMul(leverage);
-    uint256 amountToBorrow = GenericLogic.calculateAmountToBorrow(marginAsset, borrowedAsset, supplyTokenAmount, _reserves, _addressesProvider.getPriceOracle());
+    uint256 supplyTokenAmount = collateralAmount.rayMul(leverage);
+    uint256 amountToShort = GenericLogic.calculateAmountToShort(marginAsset, shortAsset, supplyTokenAmount, _reserves, _addressesProvider.getPriceOracle());
 
-    ValidationLogic.validateOpenPosition(_reserves[marginAsset], borrowedReserve, _reserves[heldAsset], marginAmount, amountToBorrow);
+    ValidationLogic.validateOpenPosition(_reserves[marginAsset], borrowedReserve, _reserves[longAsset], collateralAmount, amountToShort);
 
-    IERC20(marginAsset).safeTransferFrom(msg.sender, address(this), marginAmount);
+    IERC20(marginAsset).safeTransferFrom(msg.sender, address(this), collateralAmount);
     
     borrowedReserve.updateState();
     IDToken(borrowedReserve.dTokenAddress).mint(
         msg.sender,
         address(this),
-        amountToBorrow,
+        amountToShort,
         borrowedReserve.borrowIndex
       );
 
     borrowedReserve.updateInterestRates(
-      borrowedAsset,
+      shortAsset,
       borrowedReserve.kTokenAddress,
       0,
-      amountToBorrow
+      amountToShort
     );
 
     // if this fails, means there is not enough balance
-    IKToken(borrowedReserve.kTokenAddress).transferUnderlyingTo(address(this), amountToBorrow);
+    IKToken(borrowedReserve.kTokenAddress).transferUnderlyingTo(address(this), amountToShort);
 
     // transfer borrowedToken into heldToken through dex (1inch)
     uint256 returnAmount;
@@ -789,7 +789,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
       (address SwapRouterAddr, address SwapExecutorAddr) = _addressesProvider.getOneInch();
       (returnAmount, ) = IAggregationRouterV4(SwapRouterAddr).swap(IAggregationExecutor(SwapExecutorAddr),desc,data);
     }
-    uint256 heldAmount = returnAmount;
+    uint256 longAmount = returnAmount;
 
     position = DataTypes.TraderPosition(
       // the trader
@@ -797,15 +797,15 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
       // the token as margin
       marginAsset,
       // the token to borrow
-      borrowedAsset,
+      shortAsset,
       // the token held
-      heldAsset,
+      longAsset,
       // the amount of provided margin
-      marginAmount,
+      collateralAmount,
       // the amount of borrowed asset
-      amountToBorrow,
+      amountToShort,
       // the amount of held asset
-      heldAmount,
+      longAmount,
       // the liquidationThreshold at trade
       _positionLiquidationThreshold,
       // id of position
@@ -823,11 +823,11 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
       // the token as margin
       marginAsset,
       // the token to borrow
-      borrowedAsset,
+      shortAsset,
       // the amount of provided margin
-      marginAmount,
+      collateralAmount,
       // the amount of borrowed asset
-      amountToBorrow,
+      amountToShort,
       // the liquidationThreshold at trade
       _positionLiquidationThreshold,
       // id of position
@@ -856,8 +856,8 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     int256 pnl
   ) {
     DataTypes.TraderPosition storage position = _positionsList[id];
-    address borrowedTokenAddress = position.borrowedTokenAddress;
-    ValidationLogic.validateClosePosition(msg.sender, position, borrowedTokenAddress);
+    address shortTokenAddress = position.shortTokenAddress;
+    ValidationLogic.validateClosePosition(msg.sender, position, shortTokenAddress);
 
     pnl = GenericLogic.getPnL(position, _reserves, _addressesProvider.getPriceOracle());
 
@@ -865,10 +865,10 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     emit ClosePosition(
       id,
       position.traderAddress,
-      position.marginTokenAddress,
-      position.marginAmount,
-      borrowedTokenAddress,
-      position.borrowedAmount
+      position.collateralTokenAddress,
+      position.collateralAmount,
+      shortTokenAddress,
+      position.shortAmount
     );
   }
 
@@ -891,11 +891,11 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     uint256 paymentAmount
   ) {
     DataTypes.TraderPosition storage position = _positionsList[id];
-    address borrowedTokenAddress = position.borrowedTokenAddress;
+    address shortTokenAddress = position.shortTokenAddress;
     ValidationLogic
       .validateLiquidationCallPosition(
         position,
-        borrowedTokenAddress,
+        shortTokenAddress,
         _reserves,
         _addressesProvider.getPriceOracle()
       );
@@ -904,18 +904,18 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
       id,
       msg.sender,
       position.traderAddress,
-      position.marginTokenAddress,
-      position.marginAmount,
-      position.borrowedTokenAddress,
-      position.borrowedAmount
+      position.collateralTokenAddress,
+      position.collateralAmount,
+      position.shortTokenAddress,
+      position.shortAmount
     );
     emit ClosePosition(
       id,
       position.traderAddress,
-      position.marginTokenAddress,
-      position.marginAmount,
-      borrowedTokenAddress,
-      position.borrowedAmount
+      position.collateralTokenAddress,
+      position.collateralAmount,
+      shortTokenAddress,
+      position.shortAmount
     );
   }
 
@@ -941,24 +941,24 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
 
   //   pnl = GenericLogic.getPnL(position, _reserves, _addressesProvider.getPriceOracle());
 
-  //   // TODO: swap the heldAsset into borrowedAsset first
-  //   uint256 returnBorrowedAmount = 0;
-  //   uint256 remainingBorrowedAmount = 0;
+  //   // TODO: swap the longAsset into shortAsset first
+  //   uint256 returnshortAmount = 0;
+  //   uint256 remainingshortAmount = 0;
 
-  //   if (position.borrowedAmount > returnBorrowedAmount) {
-  //     // TODO: swap all margin into borrowedAsset
-  //     uint256 returnMarginAmount = 0;
-  //     remainingBorrowedAmount = returnMarginAmount.add(returnBorrowedAmount).sub(position.borrowedAmount);
+  //   if (position.shortAmount > returnshortAmount) {
+  //     // TODO: swap all margin into shortAsset
+  //     uint256 returncollateralAmount = 0;
+  //     remainingshortAmount = returncollateralAmount.add(returnshortAmount).sub(position.shortAmount);
   //   } else {
-  //     remainingBorrowedAmount = returnBorrowedAmount.sub(position.borrowedAmount);
+  //     remainingshortAmount = returnshortAmount.sub(position.shortAmount);
   //   }
 
-  //   if (paymentAsset != position.borrowedTokenAddress && remainingBorrowedAmount != 0) {
+  //   if (paymentAsset != position.shortTokenAddress && remainingshortAmount != 0) {
   //     // TODO: swap the rest of profits into paymentAsset
   //     paymentAmount = 0;
 
   //   } else {
-  //     paymentAmount = remainingBorrowedAmount;
+  //     paymentAmount = remainingshortAmount;
   //   }
 
   //   IERC20(paymentAsset).safeTransfer(msg.sender, paymentAmount);
@@ -974,23 +974,23 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     IAggregationRouterV4.SwapDescription memory desc,
     bytes calldata data
   ) internal returns (uint256 paymentAmount) {
-    address borrowedTokenAddress = position.borrowedTokenAddress;
-    // TODO: swap the heldAsset into borrowedAsset first
+    address shortTokenAddress = position.shortTokenAddress;
+    // TODO: swap the longAsset into shortAsset first
     {
-      uint256 returnHeldAmount;
-      uint256 returnMarginAmount;
+      uint256 returnlongAmount;
+      uint256 returncollateralAmount;
       {
         (address SwapRouterAddr, address SwapExecutorAddr) = _addressesProvider.getOneInch();
-        (returnHeldAmount, ) = IAggregationRouterV4(SwapRouterAddr).swap(IAggregationExecutor(SwapExecutorAddr), desc, data);
-        (returnMarginAmount, ) = IAggregationRouterV4(SwapRouterAddr).swap(IAggregationExecutor(SwapExecutorAddr), desc1, data1);
+        (returnlongAmount, ) = IAggregationRouterV4(SwapRouterAddr).swap(IAggregationExecutor(SwapExecutorAddr), desc, data);
+        (returncollateralAmount, ) = IAggregationRouterV4(SwapRouterAddr).swap(IAggregationExecutor(SwapExecutorAddr), desc1, data1);
       }
 
-      paymentAmount = returnHeldAmount.add(returnMarginAmount).sub(position.borrowedAmount);
+      paymentAmount = returnlongAmount.add(returncollateralAmount).sub(position.shortAmount);
     }
     // repay
-    DataTypes.ReserveData storage borrowedReserve = _reserves[borrowedTokenAddress];
+    DataTypes.ReserveData storage borrowedReserve = _reserves[shortTokenAddress];
 
-    uint256 paybackAmount = position.borrowedAmount;
+    uint256 paybackAmount = position.shortAmount;
 
     borrowedReserve.updateState();
 
@@ -1003,20 +1003,20 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     }
     {
       address kToken = borrowedReserve.kTokenAddress;
-      borrowedReserve.updateInterestRates(borrowedTokenAddress, kToken, paybackAmount, 0);
+      borrowedReserve.updateInterestRates(shortTokenAddress, kToken, paybackAmount, 0);
 
-      uint256 variableDebt = IERC20(borrowedTokenAddress).balanceOf(pool);
+      uint256 variableDebt = IERC20(shortTokenAddress).balanceOf(pool);
       if (variableDebt.sub(paybackAmount) == 0) {
         _usersConfig[pool].isBorrowing[borrowedReserve.id] = false;
       }
 
-      IERC20(borrowedTokenAddress).safeTransfer(kToken, paybackAmount);
+      IERC20(shortTokenAddress).safeTransfer(kToken, paybackAmount);
 
       IKToken(kToken).handleRepayment(pool, paybackAmount);
     }
     {
       _positionsList[id].isOpen = false;
-      IERC20(borrowedTokenAddress).safeTransfer(receiver, paymentAmount);
+      IERC20(shortTokenAddress).safeTransfer(receiver, paymentAmount);
     }
   }
 

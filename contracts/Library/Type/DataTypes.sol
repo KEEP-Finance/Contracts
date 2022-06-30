@@ -53,17 +53,17 @@ library DataTypes {
     // the trader
     address traderAddress;
     // the token as margin
-    address marginTokenAddress;
+    address collateralTokenAddress;
     // the token to borrow
-    address borrowedTokenAddress;
+    address shortTokenAddress;
     // the token held
-    address heldTokenAddress;
+    address longTokenAddress;
     // the amount of provided margin
-    uint256 marginAmount;
+    uint256 collateralAmount;
     // the amount of borrowed asset
-    uint256 borrowedAmount;
+    uint256 shortAmount;
     // the amount of held asset
-    uint256 heldAmount;
+    uint256 longAmount;
     // the liquidationThreshold at trade
     uint256 liquidationThreshold;
     // the id of position
