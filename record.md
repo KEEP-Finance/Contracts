@@ -34,6 +34,8 @@
 
         - Swap
 
+            for the swaps, there are currently two choices: the first is to put the path information as input of the contract; the second is to put the path information abstracted from contract abi (implemented inside the function)
+
     - Price oracle -- precisely get mark price (pnl estimation and prevent unfair liquidation) and index price from dex.
         
         - Mark Price is the 15min twap on DEX
