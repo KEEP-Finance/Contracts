@@ -1,20 +1,29 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface ISwapRouter {
+import {ISwapRouter} from '../../Interface/ISwapRouter.sol';
+
+contract UniswapRouterAdapter is ISwapRouter {
+
+  constructor() {}
+
   function SwapTokensForExactTokens(
     address tokenIn,
     address tokenOut,
     uint256 amountOut,
     address recipient
-  ) external returns (uint256 _amountIn, uint256 _amountOut);
+  ) external override returns (uint256 _amountIn, uint256 _amountOut) {
+
+  }
 
   function SwapExactTokensForTokens(
     address tokenIn,
     address tokenOut,
     uint256 amountIn,
     address recipient
-  ) external returns (uint256 _amountIn, uint256 _amountOut);
+  ) external override returns (uint256 _amountIn, uint256 _amountOut) {
+
+  }
 
   /**
    * @dev get the relative price of price A / price B, in wad
@@ -25,7 +34,9 @@ interface ISwapRouter {
   function GetRelativePrice(
     address tokenA,
     address tokenB
-  ) external view returns (uint256);
+  ) external view override returns (uint256) {
+
+  }
 
   /**
    * @dev get the time-weighted average relative price of price A / price B, in wad
@@ -37,5 +48,7 @@ interface ISwapRouter {
     address tokenA,
     address tokenB,
     uint256 timeInterval
-  ) external view returns (uint256);
+  ) external view override returns (uint256) {
+
+  }
 }
