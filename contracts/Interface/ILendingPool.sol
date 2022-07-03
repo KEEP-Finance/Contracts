@@ -266,6 +266,21 @@ interface ILendingPool {
   ) external;
 
   /**
+   * @dev Close a position, swap all margin / pnl into paymentAsset
+   * @param id The id of position
+   * @return paymentAmount The amount of asset to payback user 
+   * @return pnl The pnl in ETH (wad)
+   **/
+  function closePosition(
+    uint256 id
+  )
+    external
+    returns (
+      uint256 paymentAmount,
+      int256 pnl
+    );
+
+  /**
    * @dev Returns the user account data across all the reserves
    * @param user The address of the user
    * @return totalCollateralETH the total collateral in ETH of the user
@@ -293,11 +308,7 @@ interface ILendingPool {
    * @return paymentAmount The amount of asset to payback user 
    **/
    function liquidationCallPosition(
-    uint id,
-    IAggregationRouterV4.SwapDescription memory desc1,
-    bytes calldata data1,
-    IAggregationRouterV4.SwapDescription memory desc,
-    bytes calldata data
+    uint id
   )
   external
   returns (

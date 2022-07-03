@@ -2,10 +2,21 @@
 pragma solidity ^0.8.0;
 
 import {ISwapRouter} from '../../Interface/ISwapRouter.sol';
+import {Ownable} from '../../Dependency/openzeppelin/Ownable.sol';
+import {IPancakeRouter01} from '../../Interface/PancakeSwap/IPancakeRouter01.sol';
+import {IPancakeRouter02} from '../../Interface/PancakeSwap/IPancakeRouter02.sol';
 
-contract PancakeswapRouterAdapter is ISwapRouter {
+contract PancakeswapRouterAdapter is ISwapRouter, Ownable {
+  IPancakeRouter01 internal pancakeRouter01;
+  IPancakeRouter02 internal pancakeRouter02;
 
-  constructor() {}
+  constructor(
+    address _router01,
+    address _router02
+  ) {
+    pancakeRouter01 = IPancakeRouter01(_router01);
+    pancakeRouter02 = IPancakeRouter02(_router02);
+  }
 
   function SwapTokensForExactTokens(
     address tokenIn,
@@ -13,7 +24,20 @@ contract PancakeswapRouterAdapter is ISwapRouter {
     uint256 amountOut,
     address recipient
   ) external override returns (uint256 _amountIn, uint256 _amountOut) {
-
+    uint256 deadline = type(uint256).max;
+    uint256 amountInMax = type(uint256).max;
+    address[] memory path = new address[](2);
+    path[0] = tokenIn;
+    path[1] = tokenOut;
+    // TODO: approve
+    _amountIn = pancakeRouter01.swapTokensForExactTokens(
+      amountOut,
+      amountInMax,
+      path,
+      msg.sender,
+      deadline
+    )[0];
+    _amountOut = amountOut;
   }
 
   function SwapExactTokensForTokens(
@@ -22,7 +46,20 @@ contract PancakeswapRouterAdapter is ISwapRouter {
     uint256 amountIn,
     address recipient
   ) external override returns (uint256 _amountIn, uint256 _amountOut) {
-
+    uint256 deadline = type(uint256).max;
+    uint256 amountOutMin = 0;
+    address[] memory path = new address[](2);
+    path[0] = tokenIn;
+    path[1] = tokenOut;
+    // TODO: approve
+    _amountIn = amountIn;
+    _amountOut = pancakeRouter01.swapExactTokensForTokens(
+      amountIn,
+      amountOutMin,
+      path,
+      msg.sender,
+      deadline
+    )[0];
   }
 
   /**
@@ -35,7 +72,7 @@ contract PancakeswapRouterAdapter is ISwapRouter {
     address tokenA,
     address tokenB
   ) external view override returns (uint256) {
-
+    
   }
 
   /**
