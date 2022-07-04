@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {ISwapRouter} from '../../Interface/ISwapRouter.sol';
+import {IKSwapRouter} from '../../Interface/IKSwapRouter.sol';
 import {Ownable} from '../../Dependency/openzeppelin/Ownable.sol';
 import {IPancakeRouter01} from '../../Interface/PancakeSwap/IPancakeRouter01.sol';
 import {IPancakeRouter02} from '../../Interface/PancakeSwap/IPancakeRouter02.sol';
 
-contract PancakeswapRouterAdapter is ISwapRouter, Ownable {
+contract PancakeswapRouterAdapter is IKSwapRouter, Ownable {
   IPancakeRouter01 internal pancakeRouter01;
   IPancakeRouter02 internal pancakeRouter02;
 
@@ -27,6 +27,7 @@ contract PancakeswapRouterAdapter is ISwapRouter, Ownable {
     uint256 deadline = type(uint256).max;
     uint256 amountInMax = type(uint256).max;
     address[] memory path = new address[](2);
+    // TODO: check
     path[0] = tokenIn;
     path[1] = tokenOut;
     // TODO: approve
@@ -34,7 +35,7 @@ contract PancakeswapRouterAdapter is ISwapRouter, Ownable {
       amountOut,
       amountInMax,
       path,
-      msg.sender,
+      recipient,
       deadline
     )[0];
     _amountOut = amountOut;
@@ -48,6 +49,7 @@ contract PancakeswapRouterAdapter is ISwapRouter, Ownable {
   ) external override returns (uint256 _amountIn, uint256 _amountOut) {
     uint256 deadline = type(uint256).max;
     uint256 amountOutMin = 0;
+    // TODO: check
     address[] memory path = new address[](2);
     path[0] = tokenIn;
     path[1] = tokenOut;
@@ -57,7 +59,7 @@ contract PancakeswapRouterAdapter is ISwapRouter, Ownable {
       amountIn,
       amountOutMin,
       path,
-      msg.sender,
+      recipient,
       deadline
     )[0];
   }
@@ -72,7 +74,7 @@ contract PancakeswapRouterAdapter is ISwapRouter, Ownable {
     address tokenA,
     address tokenB
   ) external view override returns (uint256) {
-    
+
   }
 
   /**
