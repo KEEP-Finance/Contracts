@@ -57,7 +57,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     _addressesProvider = provider;
     _maxNumberOfReserves = type(uint256).max;
     _maximumLeverage = 20 * (10**27);
-    _positionLiquidationThreshold = 2 * (10**26);
+    _positionLiquidationThreshold = 2 * (10**25);
   }
 
   /**
@@ -872,12 +872,13 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
   function liquidationCallPosition(
     uint id
   )
-  external
-  override
-  whenNotPaused
-  returns (
-    uint256 paymentAmount
-  ) {
+    external
+    override
+    whenNotPaused
+    returns (
+      uint256 paymentAmount
+    )
+  {
     DataTypes.TraderPosition storage position = _positionsList[id];
     address shortTokenAddress = position.shortTokenAddress;
     ValidationLogic

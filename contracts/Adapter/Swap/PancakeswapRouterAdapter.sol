@@ -3,12 +3,18 @@ pragma solidity ^0.8.0;
 
 import {IKSwapRouter} from '../../Interface/IKSwapRouter.sol';
 import {Ownable} from '../../Dependency/openzeppelin/Ownable.sol';
+import {IERC20} from '../../Dependency/openzeppelin/IERC20.sol';
+import {SafeERC20} from '../../Dependency/openzeppelin/SafeERC20.sol';
 import {IPancakeRouter01} from '../../Interface/PancakeSwap/IPancakeRouter01.sol';
 import {IPancakeRouter02} from '../../Interface/PancakeSwap/IPancakeRouter02.sol';
 
 contract PancakeswapRouterAdapter is IKSwapRouter, Ownable {
+  using SafeERC20 for IERC20;
+
   IPancakeRouter01 internal pancakeRouter01;
   IPancakeRouter02 internal pancakeRouter02;
+
+  mapping(address => bool) assetIsApproved;
 
   constructor(
     address _router01,
@@ -30,7 +36,14 @@ contract PancakeswapRouterAdapter is IKSwapRouter, Ownable {
     // TODO: check
     path[0] = tokenIn;
     path[1] = tokenOut;
-    // TODO: approve
+    // approve
+    if (assetIsApproved[tokenIn] != true) {
+      IERC20(tokenIn).safeIncreaseAllowance(
+        address(pancakeRouter01),
+        type(uint256).max
+      );
+      assetIsApproved[tokenIn] = true;
+    }
     _amountIn = pancakeRouter01.swapTokensForExactTokens(
       amountOut,
       amountInMax,
@@ -53,7 +66,14 @@ contract PancakeswapRouterAdapter is IKSwapRouter, Ownable {
     address[] memory path = new address[](2);
     path[0] = tokenIn;
     path[1] = tokenOut;
-    // TODO: approve
+    // approve
+    if (assetIsApproved[tokenIn] != true) {
+      IERC20(tokenIn).safeIncreaseAllowance(
+        address(pancakeRouter01),
+        type(uint256).max
+      );
+      assetIsApproved[tokenIn] = true;
+    }
     _amountIn = amountIn;
     _amountOut = pancakeRouter01.swapExactTokensForTokens(
       amountIn,

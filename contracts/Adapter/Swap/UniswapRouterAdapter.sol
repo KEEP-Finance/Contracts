@@ -4,9 +4,15 @@ pragma solidity ^0.8.0;
 import {IKSwapRouter} from '../../Interface/IKSwapRouter.sol';
 import {ISwapRouter} from '../../Interface/Uniswap/ISwapRouter.sol';
 import {Ownable} from '../../Dependency/openzeppelin/Ownable.sol';
+import {IERC20} from '../../Dependency/openzeppelin/IERC20.sol';
+import {SafeERC20} from '../../Dependency/openzeppelin/SafeERC20.sol';
 
 contract UniswapRouterAdapter is IKSwapRouter, Ownable {
+  using SafeERC20 for IERC20;
+
   ISwapRouter internal uniswapSwapRouter;
+  mapping(address => bool) assetIsApproved;
+
   constructor(address _uniswapSwapRouter) {
     uniswapSwapRouter = ISwapRouter(_uniswapSwapRouter);
   }
@@ -17,6 +23,15 @@ contract UniswapRouterAdapter is IKSwapRouter, Ownable {
     uint256 amountOut,
     address recipient
   ) external override returns (uint256 _amountIn, uint256 _amountOut) {
+    // approve
+    if (assetIsApproved[tokenIn] != true) {
+      IERC20(tokenIn).safeIncreaseAllowance(
+        address(uniswapSwapRouter),
+        type(uint256).max
+      );
+      assetIsApproved[tokenIn] = true;
+    }
+
     ISwapRouter.ExactOutputSingleParams memory params = ISwapRouter.ExactOutputSingleParams(
     tokenIn, // address tokenIn;
     tokenOut, // address tokenOut;
@@ -37,6 +52,15 @@ contract UniswapRouterAdapter is IKSwapRouter, Ownable {
     uint256 amountIn,
     address recipient
   ) external override returns (uint256 _amountIn, uint256 _amountOut) {
+    // approve
+    if (assetIsApproved[tokenIn] != true) {
+      IERC20(tokenIn).safeIncreaseAllowance(
+        address(uniswapSwapRouter),
+        type(uint256).max
+      );
+      assetIsApproved[tokenIn] = true;
+    }
+
     ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams(
       tokenIn, // address tokenIn;
       tokenOut, // address tokenOut;
