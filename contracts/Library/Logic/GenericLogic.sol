@@ -33,14 +33,6 @@ library GenericLogic {
     bool reserveUsageAsCollateralEnabled;
   }
 
-  function swapToTargetAsset(
-    
-  ) external returns (
-    uint256 longAmount
-  ) {
-
-  }
-
   function calculateAmountToShort(
     address supplyTokenAddress,
     address borrowTokenAddress,
@@ -78,7 +70,8 @@ library GenericLogic {
   }
 
   // returns health factor in wad
-  // NOTE: since liquidation call's asset is not directly swapped using the DEX, we use chainlink price
+  // NOTE: since liquidation call's asset is not directly swapped using the DEX,
+  // we use chainlink price
   function calculatePositionHealthFactor(
     DataTypes.TraderPosition storage position,
     uint256 positionLiquidationThreshold,

@@ -84,6 +84,14 @@ contract PancakeswapRouterAdapter is IKSwapRouter, Ownable {
     )[0];
   }
 
+  function GetQuote(
+    uint amountA,
+    uint reserveA,
+    uint reserveB
+  ) external view override returns (uint amountB) {
+    return pancakeRouter01.quote(amountA, reserveA, reserveB);
+  }
+
   /**
    * @dev get the relative price of price A / price B, in wad
    * @param tokenA the address of first token

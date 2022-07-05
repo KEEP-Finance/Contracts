@@ -16,6 +16,8 @@ interface IKSwapRouter {
     address recipient
   ) external returns (uint256 _amountIn, uint256 _amountOut);
 
+  function GetQuote(uint amountA, uint reserveA, uint reserveB) external view returns (uint amountB);
+
   /**
    * @dev get the relative price of price A / price B, in wad
    * @param tokenA the address of first token

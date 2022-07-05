@@ -18,7 +18,7 @@ contract LendingPoolAddressesProvider is Ownable, ILendingPoolAddressesProvider 
   bytes32 private constant MAIN_ADMIN = 'MAIN_ADMIN';
   bytes32 private constant EMERGENCY_ADMIN = 'EMERGENCY_ADMIN';
   bytes32 private constant PRICE_ORACLE = 'PRICE_ORACLE';
-  bytes32 private constant DEX = 'DEX';
+  bytes32 private constant SWAP_ROUTER = 'SWAP_ROUTER';
   bytes32 private constant ONEINCH_ROUTER = 'ONEINCH_ROUTER';
   bytes32 private constant ONEINCH_EXECUTOR = 'ONEINCH_EXECUTOR';
 
@@ -173,13 +173,13 @@ contract LendingPoolAddressesProvider is Ownable, ILendingPoolAddressesProvider 
     emit PriceOracleUpdated(priceOracle);
   }
 
-  function getDEX() external view override returns (address) {
-    return getAddress(DEX);
+  function getSwapRouter() external view override returns (address) {
+    return getAddress(SWAP_ROUTER);
   }
 
-  function setDEX(address dex) external override onlyOwner {
-    _addresses[DEX] = dex;
-    emit DEXUpdated(dex);
+  function setSwapRouter(address swapRouter) external override onlyOwner {
+    _addresses[SWAP_ROUTER] = swapRouter;
+    emit SwapRouterUpdated(swapRouter);
   }
 
   function getOneInch() external view override returns (address, address) {

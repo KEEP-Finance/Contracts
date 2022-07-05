@@ -74,6 +74,15 @@ contract UniswapRouterAdapter is IKSwapRouter, Ownable {
     _amountIn = amountIn;
     _amountOut = uniswapSwapRouter.exactInputSingle(params);
   }
+  
+  function GetQuote(
+    uint amountA,
+    uint reserveA,
+    uint reserveB
+  ) external view override returns (uint amountB) {
+    
+  }
+
 
   /**
    * @dev get the relative price of price A / price B, in wad
