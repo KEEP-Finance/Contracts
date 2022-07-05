@@ -15,11 +15,11 @@ module.exports = {
   networks: {
     hardhat: {
     },
-    Mumbai: {
-      url: "https://matic-mumbai.chainstacklabs.com",
-      accounts: [`0x${PRIVATE_KEY}`],
-      gasPrice: 8000000000, // default is 'auto' which breaks chains without the london hardfork
-    },
+    // Mumbai: {
+    //   url: "https://matic-mumbai.chainstacklabs.com",
+    //   accounts: [`0x${PRIVATE_KEY}`],
+    //   gasPrice: 8000000000, // default is 'auto' which breaks chains without the london hardfork
+    // },
     // BscTestnet: {
     //   url: "https://data-seed-prebsc-1-s3.binance.org:8545",
     //   accounts: [`0x${PRIVATE_KEY}`]
@@ -32,10 +32,10 @@ module.exports = {
     //   // url: "https://testnet.emerald.oasis.dev/",
     //   // accounts: [`0x${PRIVATE_KEY}`]
     // },
-    OptimismTestnet: {
-      url: "https://kovan.optimism.io/",
-      accounts: [`0x${PRIVATE_KEY}`]
-    },
+    // OptimismTestnet: {
+    //   url: "https://kovan.optimism.io/",
+    //   accounts: [`0x${PRIVATE_KEY}`]
+    // },
   },
   solidity: {
     version: "0.8.14",

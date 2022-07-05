@@ -75,11 +75,7 @@ contract PositionKeeper is KeeperCompatibleInterface {
         bytes memory data
     ) internal {
         LendingPool.liquidationCallPosition(
-            id,
-            desc1,
-            data1,
-            desc,
-            data
+            id
         );
     }
 
