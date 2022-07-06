@@ -149,7 +149,7 @@ interface ILendingPool {
     uint256 shortAmount
   );
 
-  event PositionLiquidated(
+  event LiquidationCallPosition(
     uint256 id,
     address liquidator,
     address traderAddress,
@@ -305,15 +305,8 @@ interface ILendingPool {
   /**
    * @dev Close a position, swap all margin / pnl into paymentAsset
    * @param id The id of position
-   * @return paymentAmount The amount of asset to payback user 
    **/
-   function liquidationCallPosition(
-    uint id
-  )
-  external
-  returns (
-    uint256 paymentAmount
-  );
+  function liquidationCallPosition(uint id) external;
 
   function initReserve(
     address reserve,
@@ -373,6 +366,8 @@ interface ILendingPool {
   function setPause(bool val) external;
 
   function paused() external view returns (bool);
+
+  function name() external view returns (string memory);
 
   function getTraderPositions(address trader) external view returns (DataTypes.TraderPosition[] memory positions);
 

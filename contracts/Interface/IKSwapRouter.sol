@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 pragma solidity ^0.8.0;
 
-interface ISwapRouter {
+interface IKSwapRouter {
   function SwapTokensForExactTokens(
     address tokenIn,
     address tokenOut,
@@ -15,6 +15,8 @@ interface ISwapRouter {
     uint256 amountIn,
     address recipient
   ) external returns (uint256 _amountIn, uint256 _amountOut);
+
+  function GetQuote(uint amountA, uint reserveA, uint reserveB) external view returns (uint amountB);
 
   /**
    * @dev get the relative price of price A / price B, in wad

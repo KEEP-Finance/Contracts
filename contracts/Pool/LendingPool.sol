@@ -20,8 +20,7 @@ import {DataTypes} from '../Library/Type/DataTypes.sol';
 import {GenericLogic} from '../Library/Logic/GenericLogic.sol';
 import {ValidationLogic} from '../Library/Logic/ValidationLogic.sol';
 import {ReserveLogic} from '../Library/Logic/ReserveLogic.sol';
-import {IAggregationRouterV4} from '../Interface/1inch/IAggregationRouterV4.sol';
-import {IAggregationExecutor} from '../Interface/1inch/IAggregationExecutor.sol';
+import {IKSwapRouter} from '../Interface/IKSwapRouter.sol';
 
 contract LendingPool is ILendingPool, LendingPoolStorage {
   using WadRayMath for uint256;
@@ -52,12 +51,14 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
   }
 
   constructor(
-    ILendingPoolAddressesProvider provider
+    ILendingPoolAddressesProvider provider,
+    string memory poolName
   ) {
     _addressesProvider = provider;
     _maxNumberOfReserves = type(uint256).max;
     _maximumLeverage = 20 * (10**27);
-    _positionLiquidationThreshold = 2 * (10**26);
+    _positionLiquidationThreshold = 2 * (10**25);
+    _name = poolName;
   }
 
   /**
@@ -754,32 +755,32 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     require(shortAsset != longAsset, Errors.GetError(Errors.Error.LP_POSITION_INVALID));
     require((leverage < _maximumLeverage) && (leverage > 10**27), Errors.GetError(Errors.Error.LP_LEVERAGE_INVALID));
 
-    DataTypes.ReserveData storage borrowedReserve = _reserves[shortAsset];
+    DataTypes.ReserveData storage shortReserve = _reserves[shortAsset];
 
     uint256 supplyTokenAmount = collateralAmount.rayMul(leverage);
     uint256 amountToShort = GenericLogic.calculateAmountToShort(collateralAsset, shortAsset, supplyTokenAmount, _reserves, _addressesProvider.getPriceOracle());
 
-    ValidationLogic.validateOpenPosition(_reserves[collateralAsset], borrowedReserve, _reserves[longAsset], collateralAmount, amountToShort);
+    ValidationLogic.validateOpenPosition(_reserves[collateralAsset], shortReserve, _reserves[longAsset], collateralAmount, amountToShort);
 
     IERC20(collateralAsset).safeTransferFrom(msg.sender, address(this), collateralAmount);
     
-    borrowedReserve.updateState();
-    IDToken(borrowedReserve.dTokenAddress).mint(
+    shortReserve.updateState();
+    IDToken(shortReserve.dTokenAddress).mint(
         msg.sender,
         address(this),
         amountToShort,
-        borrowedReserve.borrowIndex
+        shortReserve.borrowIndex
       );
 
-    borrowedReserve.updateInterestRates(
+    shortReserve.updateInterestRates(
       shortAsset,
-      borrowedReserve.kTokenAddress,
+      shortReserve.kTokenAddress,
       0,
       amountToShort
     );
 
     // if this fails, means there is not enough balance
-    IKToken(borrowedReserve.kTokenAddress).transferUnderlyingTo(address(this), amountToShort);
+    IKToken(shortReserve.kTokenAddress).transferUnderlyingTo(address(this), amountToShort);
 
     // transfer borrowedToken into heldToken through dex (1inch)
     uint256 returnAmount;
@@ -853,7 +854,8 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
 
     pnl = GenericLogic.getPnL(position, _reserves, _addressesProvider.getPriceOracle());
 
-    paymentAmount = _closePosition(position, id, msg.sender, address(this));
+    paymentAmount = _closePosition(position, msg.sender, address(this));
+
     emit ClosePosition(
       id,
       position.traderAddress,
@@ -867,28 +869,26 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
   /**
    * @dev Close a position, swap all margin / pnl into paymentAsset
    * @param id The id of position
-   * @return paymentAmount The amount of asset to payback user 
    **/
   function liquidationCallPosition(
     uint id
   )
-  external
-  override
-  whenNotPaused
-  returns (
-    uint256 paymentAmount
-  ) {
+    external
+    override
+    whenNotPaused
+  {
     DataTypes.TraderPosition storage position = _positionsList[id];
-    address shortTokenAddress = position.shortTokenAddress;
-    ValidationLogic
-      .validateLiquidationCallPosition(
+
+    ValidationLogic.validateLiquidationCallPosition(
         position,
-        shortTokenAddress,
+        position.shortTokenAddress,
         _reserves,
         _addressesProvider.getPriceOracle()
       );
-    paymentAmount = _closePosition(position, id, msg.sender, address(this));
-    emit PositionLiquidated(
+    
+    _liquidationCallPosition(position, msg.sender);
+
+    emit LiquidationCallPosition(
       id,
       msg.sender,
       position.traderAddress,
@@ -902,59 +902,122 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
       position.traderAddress,
       position.collateralTokenAddress,
       position.collateralAmount,
-      shortTokenAddress,
+      position.shortTokenAddress,
       position.shortAmount
     );
   }
 
   function _closePosition(
     DataTypes.TraderPosition storage position,
-    uint256 id,
     address receiver,
     address pool
   ) internal returns (uint256 paymentAmount) {
-    address shortTokenAddress = position.shortTokenAddress;
-    // TODO: swap the longAsset into shortAsset first
+    // swap the longAsset into shortAsset first, compensate using collateral if there are losses
     {
-      uint256 returnlongAmount;
-      uint256 returncollateralAmount;
+      uint256 returnShortAmount;
+      IKSwapRouter swapRouter = IKSwapRouter(_addressesProvider.getSwapRouter());
+
       {
-        
+        IERC20(position.longTokenAddress).safeTransfer(address(swapRouter), position.longAmount);
+        (, returnShortAmount) = swapRouter.SwapExactTokensForTokens(
+          position.longTokenAddress,
+          position.shortTokenAddress,
+          position.longAmount,
+          address(this)
+        );
       }
 
-      paymentAmount = returnlongAmount.add(returncollateralAmount).sub(position.shortAmount);
+      if (position.shortAmount <= returnShortAmount) {
+        paymentAmount = 0;
+
+        if (position.shortAmount < returnShortAmount) {
+          IERC20(position.longTokenAddress)
+            .safeTransfer(address(swapRouter), returnShortAmount.sub(position.shortAmount));
+          (, paymentAmount) = swapRouter.SwapExactTokensForTokens(
+            position.shortTokenAddress,
+            position.collateralTokenAddress,
+            returnShortAmount.sub(position.shortAmount),
+            address(this)
+          );
+        }
+        
+        paymentAmount.add(position.collateralAmount);
+      } else {
+        IERC20(position.longTokenAddress)
+            .safeTransfer(address(swapRouter), position.shortAmount.sub(returnShortAmount));
+        (, uint256 collateralSpent) = swapRouter.SwapExactTokensForTokens(
+            position.collateralTokenAddress,
+            position.shortTokenAddress,
+            position.shortAmount.sub(returnShortAmount),
+            address(this)
+          );
+        paymentAmount = position.collateralAmount.sub(collateralSpent);
+      }
+
     }
     // repay
-    DataTypes.ReserveData storage borrowedReserve = _reserves[shortTokenAddress];
+    DataTypes.ReserveData storage shortReserve = _reserves[position.shortTokenAddress];
 
     uint256 paybackAmount = position.shortAmount;
 
-    borrowedReserve.updateState();
+    shortReserve.updateState();
 
     {
-      IDToken(borrowedReserve.dTokenAddress).burn(
+      IDToken(shortReserve.dTokenAddress).burn(
         pool,
         paybackAmount,
-        borrowedReserve.borrowIndex
+        shortReserve.borrowIndex
       );
     }
     {
-      address kToken = borrowedReserve.kTokenAddress;
-      borrowedReserve.updateInterestRates(shortTokenAddress, kToken, paybackAmount, 0);
+      shortReserve.updateInterestRates(position.shortTokenAddress, shortReserve.kTokenAddress, paybackAmount, 0);
 
-      uint256 variableDebt = IERC20(shortTokenAddress).balanceOf(pool);
+      uint256 variableDebt = IERC20(position.shortTokenAddress).balanceOf(pool);
       if (variableDebt.sub(paybackAmount) == 0) {
-        _usersConfig[pool].isBorrowing[borrowedReserve.id] = false;
+        _usersConfig[pool].isBorrowing[shortReserve.id] = false;
       }
 
-      IERC20(shortTokenAddress).safeTransfer(kToken, paybackAmount);
+      IERC20(position.shortTokenAddress).safeTransfer(shortReserve.kTokenAddress, paybackAmount);
 
-      IKToken(kToken).handleRepayment(pool, paybackAmount);
+      IKToken(shortReserve.kTokenAddress).handleRepayment(pool, paybackAmount);
     }
     {
-      _positionsList[id].isOpen = false;
-      IERC20(shortTokenAddress).safeTransfer(receiver, paymentAmount);
+      _positionsList[position.id].isOpen = false;
+      IERC20(position.collateralTokenAddress).safeTransfer(receiver, paymentAmount);
     }
+  }
+
+  function _liquidationCallPosition(
+    DataTypes.TraderPosition storage position,
+    address caller
+  ) internal {
+    // repay
+    DataTypes.ReserveData storage shortReserve = _reserves[position.shortTokenAddress];
+
+    shortReserve.updateState();
+    IDToken(shortReserve.dTokenAddress).burn(
+      address(this),
+      position.shortAmount,
+      shortReserve.borrowIndex
+    );
+
+    shortReserve.updateInterestRates(position.shortTokenAddress, shortReserve.kTokenAddress, position.shortAmount, 0);
+
+    uint256 variableDebt = IERC20(position.shortTokenAddress).balanceOf(address(this));
+    if (variableDebt.sub(position.shortAmount) == 0) {
+      _usersConfig[address(this)].isBorrowing[shortReserve.id] = false;
+    }
+
+    IERC20(position.shortTokenAddress).safeTransferFrom(
+      caller,
+      shortReserve.kTokenAddress,
+      position.shortAmount
+    );
+    IKToken(shortReserve.kTokenAddress).handleRepayment(address(this), position.shortAmount);
+
+    _positionsList[position.id].isOpen = false;
+    IERC20(position.longTokenAddress).safeTransfer(caller, position.longAmount);
+    IERC20(position.collateralTokenAddress).safeTransfer(caller, position.collateralAmount);
   }
 
   function _addPositionToList(DataTypes.TraderPosition memory position) internal {
@@ -981,4 +1044,9 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     pnl = GenericLogic.getPnL(position, _reserves, _addressesProvider.getPriceOracle());
     healthFactor = GenericLogic.calculatePositionHealthFactor(position, _positionLiquidationThreshold, _reserves, _addressesProvider.getPriceOracle());
   }
+
+  function name() external view override returns (string memory) {
+    return _name;
+  }
+
 }

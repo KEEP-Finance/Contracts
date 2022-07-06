@@ -40,12 +40,6 @@ contract PositionKeeper is KeeperCompatibleInterface {
 
     function performUpkeep(bytes calldata performData) external override {
         uint length = LendingPool.getUsersList().length;
-        (
-            IAggregationRouterV4.SwapDescription memory desc1,
-            bytes memory data1,
-            IAggregationRouterV4.SwapDescription memory desc,
-            bytes memory data
-        ) = abi.decode(performData, (IAggregationRouterV4.SwapDescription, bytes, IAggregationRouterV4.SwapDescription, bytes));
         for (uint i = 0; i < length; i++) {
             address userToCheck = LendingPool.getUsersList()[i];
             uint positionLength = LendingPool.getTraderPositions(userToCheck).length;
@@ -55,11 +49,7 @@ contract PositionKeeper is KeeperCompatibleInterface {
                 bool needsCheck = checkUnique(position.id);
                 if (needsCheck) {
                     performUnique(
-                        position.id,
-                        desc1,
-                        data1,
-                        desc,
-                        data
+                        position.id
                     );
                     return;
                 }
@@ -68,11 +58,7 @@ contract PositionKeeper is KeeperCompatibleInterface {
     }
 
     function performUnique(
-        uint id,
-        IAggregationRouterV4.SwapDescription memory desc1,
-        bytes memory data1,
-        IAggregationRouterV4.SwapDescription memory desc,
-        bytes memory data
+        uint id
     ) internal {
         LendingPool.liquidationCallPosition(
             id
@@ -104,7 +90,7 @@ contract PositionKeeper is KeeperCompatibleInterface {
         returns (bool runCheck)
     {
         (
-            int256 pnl,
+            /* int256 pnl */,
             uint256 healthFactor
         ) = LendingPool.getPositionData(id);
 

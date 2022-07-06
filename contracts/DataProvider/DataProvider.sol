@@ -31,9 +31,20 @@ contract DataProvider is IDataProvider {
     ADDRESSES_PROVIDER = addressesProvider;
   }
 
-  // function getPoolNumber() external view override returns (uint) {
-  //   return ADDRESSES_PROVIDER.getAllPools().length;
-  // }
+  function getAllPoolData() external view override returns (PoolData[] memory) {
+    address[] memory pools = ADDRESSES_PROVIDER.getAllPools();
+    PoolData[] memory poolsData = new PoolData[](pools.length);
+    for (uint i = 0; i < pools.length; i++) {
+      address pool_address = pools[i];
+      poolsData[i] = PoolData(
+          pool_address,
+          ADDRESSES_PROVIDER.getLendingPoolID(pool_address),
+          ILendingPool(pool_address).name(),
+          ILendingPool(pool_address).paused()
+        );
+    }
+    return poolsData;
+  }
 
   function getAddressesProvider() external view override returns (ILendingPoolAddressesProvider) {
     return ADDRESSES_PROVIDER;
@@ -95,6 +106,26 @@ contract DataProvider is IDataProvider {
     return reserve;
   }
 
+  function getAllReserveData(uint id)
+    external
+    view
+    override
+    returns (
+      DataTypes.ReserveData[] memory
+    )
+  {
+    (address pool_address,) = ADDRESSES_PROVIDER.getLendingPool(id);
+    ILendingPool pool = ILendingPool(pool_address);
+    address[] memory reserves = pool.getReservesList();
+
+    DataTypes.ReserveData[] memory reservesData = new DataTypes.ReserveData[](reserves.length);
+    for (uint256 i = 0; i < reserves.length; i++) {
+      reservesData[i] = pool.getReserveData(reserves[i]);
+    }
+
+    return reservesData;
+  }
+
   function getUserReserveData(uint id, address asset, address user)
     external
     view
@@ -138,6 +169,12 @@ contract DataProvider is IDataProvider {
       reserve.kTokenAddress,
       reserve.dTokenAddress
     );
+  }
+
+  function getTraderPositions(uint id, address trader) external view override returns (DataTypes.TraderPosition[] memory positions) {
+    (address pool_address,) = ADDRESSES_PROVIDER.getLendingPool(id);
+    ILendingPool pool = ILendingPool(pool_address);
+    return pool.getTraderPositions(trader);
   }
 
 }

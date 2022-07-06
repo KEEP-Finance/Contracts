@@ -33,30 +33,20 @@ library GenericLogic {
     bool reserveUsageAsCollateralEnabled;
   }
 
-  function swapToTargetAsset(
-    
-  ) external returns (
-    uint256 longAmount
-  ) {
-
-  }
-
   function calculateAmountToShort(
     address supplyTokenAddress,
     address borrowTokenAddress,
     uint256 supplyTokenAmount,
     mapping(address => DataTypes.ReserveData) storage reservesData,
     address oracle
-  ) external view returns (
-    uint256 amountToShort
-  ) {
+  ) external view returns (uint256 amountToShort) {
     uint256 supplyUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(supplyTokenAddress);
     uint8 supplyDecimals = reservesData[supplyTokenAddress].configuration.decimals;
-    uint256 borrowUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(borrowTokenAddress);
-    uint8 borrowDecimals = reservesData[borrowTokenAddress].configuration.decimals;
+    uint256 shortUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(borrowTokenAddress);
+    uint8 shortDecimals = reservesData[borrowTokenAddress].configuration.decimals;
 
-    amountToShort = supplyTokenAmount.mul(supplyUnitPrice).mul(10**borrowDecimals);
-    amountToShort = amountToShort.div(borrowUnitPrice).div(10**supplyDecimals);
+    amountToShort = supplyTokenAmount.mul(supplyUnitPrice).mul(10**shortDecimals);
+    amountToShort = amountToShort.div(shortUnitPrice).div(10**supplyDecimals);
   }
 
   function getPnL(
@@ -64,52 +54,54 @@ library GenericLogic {
     mapping(address => DataTypes.ReserveData) storage reservesData,
     address oracle
   )
-  external
-  view
-  returns (int256 pnl)
+    external
+    view
+    returns (int256 pnl)
   {
-    uint256 borrowUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(position.shortTokenAddress);
-    uint8 borrowDecimals = reservesData[position.shortTokenAddress].configuration.decimals;
-    uint256 borrowValue = borrowUnitPrice.mul(position.shortAmount).div(10**borrowDecimals);
+    uint256 shortUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(position.shortTokenAddress);
+    uint8 shortDecimals = reservesData[position.shortTokenAddress].configuration.decimals;
+    uint256 shortValue = shortUnitPrice.mul(position.shortAmount).div(10**shortDecimals);
 
-    uint256 heldUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(position.longTokenAddress);
-    uint8 heldDecimals = reservesData[position.longTokenAddress].configuration.decimals;
-    uint256 heldValue = heldUnitPrice.mul(position.longAmount).div(10**heldDecimals);
+    uint256 longUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(position.longTokenAddress);
+    uint8 longDecimals = reservesData[position.longTokenAddress].configuration.decimals;
+    uint256 longValue = longUnitPrice.mul(position.longAmount).div(10**longDecimals);
     
-    pnl = int256(heldValue) - int256(borrowValue);
+    pnl = int256(longValue) - int256(shortValue);
   }
 
   // returns health factor in wad
+  // NOTE: since liquidation call's asset is not directly swapped using the DEX,
+  // we use chainlink price
   function calculatePositionHealthFactor(
     DataTypes.TraderPosition storage position,
     uint256 positionLiquidationThreshold,
     mapping(address => DataTypes.ReserveData) storage reservesData,
     address oracle
   )
-  external
-  view
-  returns (uint256 healthFactor)
+    external
+    view
+    returns (uint256 healthFactor)
   {
-    uint256 borrowValue;
-    uint256 heldValue;
+    uint256 shortValue;
+    uint256 longValue;
     uint256 marginValue;
 
     {
-      uint256 borrowUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(position.shortTokenAddress);
-      uint8 borrowDecimals = reservesData[position.shortTokenAddress].configuration.decimals;
-      borrowValue = borrowUnitPrice.mul(position.shortAmount).div(10**borrowDecimals);
+      uint256 shortUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(position.shortTokenAddress);
+      uint8 shortDecimals = reservesData[position.shortTokenAddress].configuration.decimals;
+      shortValue = shortUnitPrice.mul(position.shortAmount).div(10**shortDecimals);
     }
     {    
-      uint256 heldUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(position.longTokenAddress);
-      uint8 heldDecimals = reservesData[position.longTokenAddress].configuration.decimals;
-      heldValue = heldUnitPrice.mul(position.longAmount).div(10**heldDecimals);
+      uint256 longUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(position.longTokenAddress);
+      uint8 longDecimals = reservesData[position.longTokenAddress].configuration.decimals;
+      longValue = longUnitPrice.mul(position.longAmount).div(10**longDecimals);
     }
     {
       uint256 marginUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(position.collateralTokenAddress);
       uint8 marginDecimals = reservesData[position.collateralTokenAddress].configuration.decimals;
       marginValue = marginUnitPrice.mul(position.collateralAmount).div(10**marginDecimals);
     }
-    healthFactor = marginValue.add(heldValue).sub(borrowValue);
+    healthFactor = marginValue.add(longValue).sub(shortValue);
     healthFactor = healthFactor.wadDiv(marginValue.rayMul(positionLiquidationThreshold));
   }
 

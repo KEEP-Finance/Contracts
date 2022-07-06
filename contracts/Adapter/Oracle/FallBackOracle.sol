@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IPriceOracleGetter} from '../../Interface/IPriceOracleGetter.sol';
 import {AggregatorV3Interface} from '../../Interface/Chainlink/AggregatorV3Interface.sol';
-import {ISwapRouter} from '../../Interface/ISwapRouter.sol';
+import {IKSwapRouter} from '../../Interface/IKSwapRouter.sol';
 import {Ownable} from '../../Dependency/openzeppelin/Ownable.sol';
 import {SafeMath} from '../../Dependency/openzeppelin/SafeMath.sol';
 

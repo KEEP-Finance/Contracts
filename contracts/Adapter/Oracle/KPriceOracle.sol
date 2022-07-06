@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {IPriceOracleGetter} from '../../Interface/IPriceOracleGetter.sol';
 import {AggregatorV3Interface} from '../../Interface/Chainlink/AggregatorV3Interface.sol';
-import {ISwapRouter} from '../../Interface/ISwapRouter.sol';
+import {IKSwapRouter} from '../../Interface/IKSwapRouter.sol';
 import {Ownable} from '../../Dependency/openzeppelin/Ownable.sol';
 
 contract KPriceOracle is IPriceOracleGetter, Ownable {
@@ -15,6 +15,7 @@ contract KPriceOracle is IPriceOracleGetter, Ownable {
   IPriceOracleGetter private _fallbackOracle;
   address public immutable BASE_CURRENCY;
   uint256 public immutable BASE_CURRENCY_UNIT;
+  uint8 internal immutable BASE_DECIMALS;
 
   /// @notice Constructor
   /// @param assets The addresses of the assets
@@ -22,19 +23,20 @@ contract KPriceOracle is IPriceOracleGetter, Ownable {
   /// @param fallbackOracle The address of the fallback oracle to use if the data of an
   ///        aggregator is not consistent
   /// @param baseCurrency the base currency used for the price quotes. If USD is used, base currency is 0x0
-  /// @param baseCurrencyUnit the unit of the base currency
+  /// @param baseDecimals the number of decimals of base currency
   constructor(
     address[] memory assets,
     address[] memory sources,
     address fallbackOracle,
     address baseCurrency,
-    uint256 baseCurrencyUnit
+    uint8 baseDecimals
   ) {
     _setFallbackOracle(fallbackOracle);
     _setAssetsSources(assets, sources);
-    BASE_CURRENCY = baseCurrency;
-    BASE_CURRENCY_UNIT = baseCurrencyUnit;
-    emit BaseCurrencySet(baseCurrency, baseCurrencyUnit);
+    BASE_CURRENCY = baseCurrency; // should be eth
+    BASE_DECIMALS = baseDecimals;
+    BASE_CURRENCY_UNIT = 10**baseDecimals; // should be 1 wad
+    emit BaseCurrencySet(baseCurrency, 10**baseDecimals);
   }
 
   /// @notice External function called by the Aave governance to set or replace sources of assets
@@ -88,9 +90,15 @@ contract KPriceOracle is IPriceOracleGetter, Ownable {
         /*uint startedAt*/,
         /*uint timeStamp*/,
         /*uint80 answeredInRound*/
-      ) = AggregatorV3Interface(source).latestRoundData();
+      ) = source.latestRoundData();
       if (price > 0) {
-        return uint256(price);
+        // NOTE: here we check the decimals of the oracle
+        uint256 result = uint256(price);
+        uint8 decimals = source.decimals();
+        if (decimals != BASE_DECIMALS) {
+          result = result * BASE_CURRENCY_UNIT / (10**decimals);
+        }
+        return result;
       } else {
         return _fallbackOracle.getAssetPrice(asset);
       }

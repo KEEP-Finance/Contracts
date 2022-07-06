@@ -11,6 +11,14 @@ interface IDataProvider {
     address tokenAddress;
   }
 
+  struct PoolData {
+    address pool;
+    uint id;
+    string name;
+    bool paused;
+  }
+
+  function getAllPoolData() external view returns (PoolData[] memory);
   function getAddressesProvider() external view returns (ILendingPoolAddressesProvider);
   function getAllReservesTokens(uint id) external view returns (TokenData[] memory);
   function getAllATokens(uint id) external view returns (TokenData[] memory);
@@ -26,6 +34,13 @@ interface IDataProvider {
     view
     returns (
       DataTypes.ReserveData memory
+    );
+  
+  function getAllReserveData(uint id)
+    external
+    view
+    returns (
+      DataTypes.ReserveData[] memory
     );
   
   function getUserReserveData(uint id, address asset, address user)
@@ -46,4 +61,9 @@ interface IDataProvider {
       address aTokenAddress,
       address variableDebtTokenAddress
     );
+
+  function getTraderPositions(uint id, address trader)
+    external
+    view
+    returns (DataTypes.TraderPosition[] memory positions);
 }

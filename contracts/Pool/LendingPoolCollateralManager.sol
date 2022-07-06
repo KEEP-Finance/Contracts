@@ -40,6 +40,7 @@ contract LendingPoolCollateralManager is
 
   uint256 internal constant LIQUIDATION_CLOSE_FACTOR_PERCENT = 5000;
 
+  // Reduce stack depth
   struct LiquidationCallLocalVars {
     uint256 userCollateralBalance;
     uint256 userVariableDebt;
@@ -154,26 +155,11 @@ contract LendingPoolCollateralManager is
 
     debtReserve.updateState();
 
-    if (vars.userVariableDebt >= vars.actualDebtToLiquidate) {
-      IDToken(debtReserve.dTokenAddress).burn(
-        user,
-        vars.actualDebtToLiquidate,
-        debtReserve.borrowIndex
-      );
-    } else {
-      // If the user doesn't have variable debt, no need to try to burn variable debt tokens
-      if (vars.userVariableDebt > 0) {
-        IDToken(debtReserve.dTokenAddress).burn(
-          user,
-          vars.userVariableDebt,
-          debtReserve.borrowIndex
-        );
-      }
-      // IStableDebtToken(debtReserve.stableDebtTokenAddress).burn(
-      //   user,
-      //   vars.actualDebtToLiquidate.sub(vars.userVariableDebt)
-      // );
-    }
+    IDToken(debtReserve.dTokenAddress).burn(
+      user,
+      vars.actualDebtToLiquidate,
+      debtReserve.borrowIndex
+    );
 
     debtReserve.updateInterestRates(
       debtAsset,

@@ -8,10 +8,10 @@ import {ReserveLogic} from '../Library/Logic/ReserveLogic.sol';
 import {ReserveLogic} from '../Library/Logic/ReserveLogic.sol';
 
 contract LendingPoolStorage {
-// using ReserveConfiguration for DataTypes.ReserveConfigurationMap;
-// using UserConfiguration for DataTypes.UserConfigurationMap;
 
   ILendingPoolAddressesProvider internal _addressesProvider;
+
+  string internal _name;
 
   // reserves, mapped by asset address
   mapping(address => DataTypes.ReserveData) internal _reserves;
@@ -29,13 +29,13 @@ contract LendingPoolStorage {
   mapping(uint256 => address) internal _reservesList;
   // the number of initialized reserves
   uint256 internal _reservesCount;
-  // the list of users who have supplied TODO: automatically remove stale users
+  // the list of users who have supplied
   mapping(uint256 => address) internal _usersList;
   // if the user has been encountered before
   mapping(address => bool) internal _userActive;
   // the number of users
   uint256 internal _usersCount;
-  // the list of traders who have opened positions TODO: automatically remove stale traders
+  // the list of traders who have opened positions
   mapping(uint256 => address) internal _tradersList;
   // if the trader has been encountered before
   mapping(address => bool) internal _traderActive;

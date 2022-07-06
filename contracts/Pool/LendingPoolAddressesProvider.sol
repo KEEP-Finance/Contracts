@@ -18,11 +18,12 @@ contract LendingPoolAddressesProvider is Ownable, ILendingPoolAddressesProvider 
   bytes32 private constant MAIN_ADMIN = 'MAIN_ADMIN';
   bytes32 private constant EMERGENCY_ADMIN = 'EMERGENCY_ADMIN';
   bytes32 private constant PRICE_ORACLE = 'PRICE_ORACLE';
-  bytes32 private constant DEX = 'DEX';
+  bytes32 private constant SWAP_ROUTER = 'SWAP_ROUTER';
   bytes32 private constant ONEINCH_ROUTER = 'ONEINCH_ROUTER';
   bytes32 private constant ONEINCH_EXECUTOR = 'ONEINCH_EXECUTOR';
 
   address[] private lending_pool_array;
+  mapping(address => uint) private lending_pool_id;
   mapping(address => address) private lending_pool_configurator_mapping;
   mapping(address => address) private lending_pool_cm_mapping;
   mapping(address => bool) private lending_pool_valid;
@@ -48,6 +49,7 @@ contract LendingPoolAddressesProvider is Ownable, ILendingPoolAddressesProvider 
   ) internal {
     require(lending_pool_valid[lending_pool_address] != true, Errors.GetError(Errors.Error.LENDING_POOL_EXIST));
     lending_pool_valid[lending_pool_address] = true;
+    lending_pool_id[lending_pool_address] = lending_pool_array.length;
     lending_pool_array.push(lending_pool_address);
     lending_pool_configurator_mapping[lending_pool_address] = lending_pool_configurator_address;
     lending_pool_cm_mapping[lending_pool_address] = lending_pool_cm_address;
@@ -58,6 +60,8 @@ contract LendingPoolAddressesProvider is Ownable, ILendingPoolAddressesProvider 
     require(lending_pool_valid[lending_pool_address] == true, Errors.GetError(Errors.Error.LENDING_POOL_NONEXIST));
     delete lending_pool_valid[lending_pool_address];
     delete lending_pool_configurator_mapping[lending_pool_address];
+    delete lending_pool_cm_mapping[lending_pool_address];
+    delete lending_pool_id[lending_pool_address];
     emit PoolRemoved(lending_pool_address);
   }
 
@@ -71,11 +75,13 @@ contract LendingPoolAddressesProvider is Ownable, ILendingPoolAddressesProvider 
         }
     }
     address[] memory all_pools = new address[](pool_number);
+
+    uint idx = 0;
     for (uint i = 0; i < pool_length; i++) {
         address curr_pool_address = lending_pool_array[i];
         if (lending_pool_valid[curr_pool_address] == true) {
-            pool_number = pool_number - 1;
-            all_pools[pool_number] = curr_pool_address;
+            all_pools[idx] = curr_pool_address;
+            idx = idx + 1;
         }
     }
     return all_pools;
@@ -99,6 +105,10 @@ contract LendingPoolAddressesProvider is Ownable, ILendingPoolAddressesProvider 
    **/
   function getLendingPool(uint id) external view override returns (address, bool) {
     return (lending_pool_array[id], lending_pool_valid[lending_pool_array[id]]);
+  }
+
+  function getLendingPoolID(address pool) external view override returns (uint) {
+    return lending_pool_id[pool];
   }
 
   function getLendingPoolConfigurator(address pool) external view override returns (address) {
@@ -173,13 +183,13 @@ contract LendingPoolAddressesProvider is Ownable, ILendingPoolAddressesProvider 
     emit PriceOracleUpdated(priceOracle);
   }
 
-  function getDEX() external view override returns (address) {
-    return getAddress(DEX);
+  function getSwapRouter() external view override returns (address) {
+    return getAddress(SWAP_ROUTER);
   }
 
-  function setDEX(address dex) external override onlyOwner {
-    _addresses[DEX] = dex;
-    emit DEXUpdated(dex);
+  function setSwapRouter(address swapRouter) external override onlyOwner {
+    _addresses[SWAP_ROUTER] = swapRouter;
+    emit SwapRouterUpdated(swapRouter);
   }
 
   function getOneInch() external view override returns (address, address) {
