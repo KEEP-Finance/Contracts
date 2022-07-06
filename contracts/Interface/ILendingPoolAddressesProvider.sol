@@ -17,6 +17,8 @@ interface ILendingPoolAddressesProvider {
 
   function getLendingPool(uint id) external view returns (address, bool);
 
+  function getLendingPoolID(address pool) external view returns (uint);
+
   function getLendingPoolConfigurator(address pool) external view returns (address);
 
   function getLendingPoolCollateralManager(address pool) external view returns (address);

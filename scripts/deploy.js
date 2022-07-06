@@ -57,8 +57,8 @@ async function main() {
 
   // 5. deploy 2 lending pools: main and eth-usdc
   const LendingPool = await hre.ethers.getContractFactory("LendingPool", {libraries: {ReserveLogic: reserve_logic.address, ValidationLogic: validation_logic.address, GenericLogic: generic_logic.address}});
-  let main_pool = await LendingPool.deploy(address_provider.address);
-  let eth_usdc_pool = await LendingPool.deploy(address_provider.address);
+  let main_pool = await LendingPool.deploy(address_provider.address, 'main');
+  let eth_usdc_pool = await LendingPool.deploy(address_provider.address, 'eth-usdc');
   await main_pool.deployed();
   await eth_usdc_pool.deployed();
   console.log("Main Pool Address: ", main_pool.address);

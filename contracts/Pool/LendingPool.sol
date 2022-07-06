@@ -51,12 +51,14 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
   }
 
   constructor(
-    ILendingPoolAddressesProvider provider
+    ILendingPoolAddressesProvider provider,
+    string memory poolName
   ) {
     _addressesProvider = provider;
     _maxNumberOfReserves = type(uint256).max;
     _maximumLeverage = 20 * (10**27);
     _positionLiquidationThreshold = 2 * (10**25);
+    _name = poolName;
   }
 
   /**
@@ -1042,4 +1044,9 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     pnl = GenericLogic.getPnL(position, _reserves, _addressesProvider.getPriceOracle());
     healthFactor = GenericLogic.calculatePositionHealthFactor(position, _positionLiquidationThreshold, _reserves, _addressesProvider.getPriceOracle());
   }
+
+  function name() external view override returns (string memory) {
+    return _name;
+  }
+
 }

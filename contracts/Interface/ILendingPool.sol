@@ -367,6 +367,8 @@ interface ILendingPool {
 
   function paused() external view returns (bool);
 
+  function name() external view returns (string memory);
+
   function getTraderPositions(address trader) external view returns (DataTypes.TraderPosition[] memory positions);
 
   function getPositionData(uint256 id) external view returns (int256 pnl, uint256 healthFactor);

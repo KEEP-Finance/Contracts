@@ -8,10 +8,10 @@ import {ReserveLogic} from '../Library/Logic/ReserveLogic.sol';
 import {ReserveLogic} from '../Library/Logic/ReserveLogic.sol';
 
 contract LendingPoolStorage {
-// using ReserveConfiguration for DataTypes.ReserveConfigurationMap;
-// using UserConfiguration for DataTypes.UserConfigurationMap;
 
   ILendingPoolAddressesProvider internal _addressesProvider;
+
+  string internal _name;
 
   // reserves, mapped by asset address
   mapping(address => DataTypes.ReserveData) internal _reserves;
