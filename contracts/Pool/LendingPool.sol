@@ -783,10 +783,11 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     IKToken(shortReserve.kTokenAddress).transferUnderlyingTo(address(this), amountToShort);
 
     // transfer borrowedToken into heldToken through dex (1inch)
-    uint256 returnAmount;
+    uint256 longAmount;
     {
+      
     }
-    uint256 longAmount = returnAmount;
+    longAmount = amountToShort;
 
     position = DataTypes.TraderPosition(
       // the trader
@@ -915,43 +916,22 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     // swap the longAsset into shortAsset first, compensate using collateral if there are losses
     {
       uint256 returnShortAmount;
-      IKSwapRouter swapRouter = IKSwapRouter(_addressesProvider.getSwapRouter());
 
       {
-        IERC20(position.longTokenAddress).safeTransfer(address(swapRouter), position.longAmount);
-        (, returnShortAmount) = swapRouter.SwapExactTokensForTokens(
-          position.longTokenAddress,
-          position.shortTokenAddress,
-          position.longAmount,
-          address(this)
-        );
+        returnShortAmount = position.longAmount;
       }
 
       if (position.shortAmount <= returnShortAmount) {
         paymentAmount = 0;
 
         if (position.shortAmount < returnShortAmount) {
-          IERC20(position.longTokenAddress)
-            .safeTransfer(address(swapRouter), returnShortAmount.sub(position.shortAmount));
-          (, paymentAmount) = swapRouter.SwapExactTokensForTokens(
-            position.shortTokenAddress,
-            position.collateralTokenAddress,
-            returnShortAmount.sub(position.shortAmount),
-            address(this)
-          );
+          
         }
         
         paymentAmount.add(position.collateralAmount);
       } else {
-        IERC20(position.longTokenAddress)
-            .safeTransfer(address(swapRouter), position.shortAmount.sub(returnShortAmount));
-        (, uint256 collateralSpent) = swapRouter.SwapExactTokensForTokens(
-            position.collateralTokenAddress,
-            position.shortTokenAddress,
-            position.shortAmount.sub(returnShortAmount),
-            address(this)
-          );
-        paymentAmount = position.collateralAmount.sub(collateralSpent);
+        
+        paymentAmount = position.collateralAmount;
       }
 
     }
