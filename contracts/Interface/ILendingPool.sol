@@ -319,6 +319,11 @@ interface ILendingPool {
 
   function setConfiguration(address reserve, DataTypes.ReserveConfiguration memory configuration) external;
 
+  function setPositionConfiguration(
+    address asset,
+    DataTypes.ReservePositionConfiguration calldata positionConfig
+  ) external;
+
   /**
    * @dev Returns the configuration of the reserve
    * @param asset The address of the underlying asset of the reserve
@@ -328,6 +333,11 @@ interface ILendingPool {
     external
     view
     returns (DataTypes.ReserveConfiguration memory);
+  
+  function getPositionConfiguration(address asset)
+    external
+    view
+    returns (DataTypes.ReservePositionConfiguration memory);
 
   function getUserConfiguration(address user, uint256 reserve_id)
     external

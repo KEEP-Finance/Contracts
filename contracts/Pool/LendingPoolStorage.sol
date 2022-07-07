@@ -45,8 +45,8 @@ contract LendingPoolStorage {
   bool internal _paused;
   // the maximum number of reserves
   uint256 internal _maxNumberOfReserves;
-  // whether or not the pool is main pool
-  bool internal _isMainPool;
+  // whether or not the pool is allowed to open position
+  bool internal _positionIsPaused;
   // the liquidation threshold for positions, in ray
   uint256 internal _positionLiquidationThreshold;
   // the maximum lending leverage, in ray

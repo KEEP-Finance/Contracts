@@ -8,8 +8,7 @@ pragma solidity ^0.8.0;
  *  basic interface of ERC20 token
   */
 interface IMockERC20 {
-    function faucet(address spender) external;
-    function mint_to_user(uint256 amount, address user_address) external;
+    function faucet(address spender, uint256 amount) external;
 
     function decimals() external view returns (uint8);
     /**

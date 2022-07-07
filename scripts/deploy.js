@@ -116,6 +116,9 @@ async function main() {
   console.log("Main pool cm address: ", main_pool_cm.address);
   console.log("ETH-USDC pool cm address: ", eth_usdc_pool_cm.address);
 
+  // TODO: 8.5. deploy swap
+  const KSwapRouter = await
+
   // 9. add 2 pools to address provider
   await address_provider.addPool(
     main_pool.address,
@@ -203,10 +206,6 @@ async function main() {
   await main_pool_configurator.setReserveFactor(USDC.address, 2000);
   await main_pool_configurator.setReserveFactor(MATIC.address, 2000);
   console.log("reserve factor: main pool")
-  await main_pool_configurator.activateReserve(ETH.address);
-  await main_pool_configurator.activateReserve(USDC.address);
-  await main_pool_configurator.activateReserve(MATIC.address);
-  console.log("reserve activated: main pool")
 
   // 11. init ETH, USDC on ETH-USDC pool
   await eth_usdc_pool_configurator.initReserve(
@@ -235,9 +234,6 @@ async function main() {
   await eth_usdc_pool_configurator.setReserveFactor(ETH.address, 2000);
   await eth_usdc_pool_configurator.setReserveFactor(USDC.address, 2000);
   console.log("reserve factor: eth-usdc pool")
-  await eth_usdc_pool_configurator.activateReserve(ETH.address);
-  await eth_usdc_pool_configurator.activateReserve(USDC.address);
-  console.log("reserve activated: eth-usdc pool")
   console.log("reserve done")
   
   // 12. unpause the pool

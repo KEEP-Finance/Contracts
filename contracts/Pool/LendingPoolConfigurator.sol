@@ -181,6 +181,24 @@ contract LendingPoolConfigurator is ILendingPoolConfigurator {
     emit CollateralConfigurationChanged(asset, ltv, liquidationThreshold, liquidationBonus);
   }
 
+  function configureReservePosition(
+    address asset,
+    bool collateralEnabled,
+    bool longEnabled,
+    bool shortEnabled
+  ) external onlyMainAdmin {
+    DataTypes.ReservePositionConfiguration memory positionConfig =
+      DataTypes.ReservePositionConfiguration(
+        false,
+        collateralEnabled,
+        longEnabled,
+        shortEnabled
+      );
+    
+    pool.setPositionConfiguration(asset, positionConfig);
+    emit PositionConfigurationChanged(collateralEnabled, longEnabled, shortEnabled);
+  }
+
   /**
    * @dev Activates a reserve
    * @param asset The address of the underlying asset of the reserve
@@ -257,6 +275,22 @@ contract LendingPoolConfigurator is ILendingPoolConfigurator {
   {
     pool.setReserveInterestRateStrategyAddress(asset, rateStrategyAddress);
     emit ReserveInterestRateStrategyChanged(asset, rateStrategyAddress);
+  }
+
+  function activateReservePosition(address asset) external onlyMainAdmin {
+    DataTypes.ReservePositionConfiguration memory currentPositionConfig = pool.getPositionConfiguration(asset);
+    currentPositionConfig.active = true;
+    pool.setPositionConfiguration(asset, currentPositionConfig);
+    emit ReservePositionActivated(asset);
+  }
+
+  // Note: trader can close position, but cannot open position with the asset after is deactivated
+  function deactivateReservePosition(address asset) external onlyMainAdmin {
+    DataTypes.ReservePositionConfiguration memory currentPositionConfig = pool.getPositionConfiguration(asset);
+    currentPositionConfig.active = false;
+    pool.setPositionConfiguration(asset, currentPositionConfig);
+
+    emit ReservePositionDeactivated(asset);
   }
 
   /**

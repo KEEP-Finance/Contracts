@@ -34,6 +34,11 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     _;
   }
 
+  modifier whenPositionNotPaused() {
+    _whenPositionNotPaused();
+    _;
+  }
+
   modifier onlyLendingPoolConfigurator() {
     _onlyLendingPoolConfigurator();
     _;
@@ -41,6 +46,10 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
 
   function _whenNotPaused() internal view {
     require(!_paused, Errors.GetError(Errors.Error.LP_IS_PAUSED));
+  }
+
+  function _whenPositionNotPaused() internal view {
+    require(!_positionIsPaused, Errors.GetError(Errors.Error.LP_POSITION_IS_PAUSED));
   }
 
   function _onlyLendingPoolConfigurator() internal view {
@@ -55,9 +64,9 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     string memory poolName
   ) {
     _addressesProvider = provider;
-    _maxNumberOfReserves = type(uint256).max;
-    _maximumLeverage = 20 * (10**27);
-    _positionLiquidationThreshold = 2 * (10**25);
+    _maxNumberOfReserves = type(uint256).max; // unlimit reserve number at first
+    _maximumLeverage = 20 * (10**27); // 20 ray
+    _positionLiquidationThreshold = 2 * (10**25); // 0.02 ray
     _name = poolName;
   }
 
@@ -402,6 +411,15 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     return _reserves[asset].configuration;
   }
 
+  function getPositionConfiguration(address asset)
+    external
+    view
+    override
+    returns (DataTypes.ReservePositionConfiguration memory)
+  {
+    return _reserves[asset].positionConfiguration;
+  }
+
   /**
    * @dev Returns the configuration of the user across all the reserves
    * @param user The user address
@@ -608,6 +626,17 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     _reserves[asset].configuration = configuration;
   }
 
+  function setPositionConfiguration(
+    address asset,
+    DataTypes.ReservePositionConfiguration calldata positionConfig
+  )
+    external
+    override
+    onlyLendingPoolConfigurator
+  {
+    _reserves[asset].positionConfiguration = positionConfig;
+  }
+
   /**
    * @dev Set the _pause state of a reserve
    * - Only callable by the LendingPoolConfigurator contract
@@ -749,9 +778,11 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
   )
     external
     whenNotPaused
+    whenPositionNotPaused
     returns (
       DataTypes.TraderPosition memory position
-    ) {
+    )
+  {
     require(shortAsset != longAsset, Errors.GetError(Errors.Error.LP_POSITION_INVALID));
     require((leverage < _maximumLeverage) && (leverage > 10**27), Errors.GetError(Errors.Error.LP_LEVERAGE_INVALID));
 
@@ -782,11 +813,20 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     // if this fails, means there is not enough balance
     IKToken(shortReserve.kTokenAddress).transferUnderlyingTo(address(this), amountToShort);
 
-    // transfer borrowedToken into heldToken through dex (1inch)
-    uint256 returnAmount;
+    // transfer short into long through dex
+    // TODO: validate after swap
+    // TODO: mock swap
+    uint256 longAmount;
     {
+      IKSwapRouter swapRouter = IKSwapRouter(_addressesProvider.getSwapRouter());
+      IERC20(shortAsset).safeTransfer(address(swapRouter), amountToShort);
+      (, longAmount) = swapRouter.SwapExactTokensForTokens(
+        shortAsset,
+        longAsset,
+        amountToShort,
+        address(this)
+      );
     }
-    uint256 longAmount = returnAmount;
 
     position = DataTypes.TraderPosition(
       // the trader
@@ -844,10 +884,12 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     external
     override
     whenNotPaused
+    whenPositionNotPaused
     returns (
       uint256 paymentAmount,
       int256 pnl
-    ) {
+    )
+  {
     DataTypes.TraderPosition storage position = _positionsList[id];
     address shortTokenAddress = position.shortTokenAddress;
     ValidationLogic.validateClosePosition(msg.sender, position, shortTokenAddress);
@@ -876,6 +918,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     external
     override
     whenNotPaused
+    whenPositionNotPaused
   {
     DataTypes.TraderPosition storage position = _positionsList[id];
 
