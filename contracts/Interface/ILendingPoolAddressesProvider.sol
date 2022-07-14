@@ -50,6 +50,4 @@ interface ILendingPoolAddressesProvider {
   function getSwapRouter() external view returns (address);
 
   function setSwapRouter(address dex) external;
-
-  function getOneInch() external view returns (address, address);
 }

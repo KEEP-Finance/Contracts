@@ -1085,7 +1085,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
   ) {
     DataTypes.TraderPosition storage position = _positionsList[id];
     pnl = GenericLogic.getPnL(position, _reserves, _addressesProvider.getPriceOracle());
-    healthFactor = GenericLogic.calculatePositionHealthFactor(position, _positionLiquidationThreshold, _reserves, _addressesProvider.getPriceOracle());
+    healthFactor = GenericLogic.calculatePositionHealthFactor(position, position.liquidationThreshold, _reserves, _addressesProvider.getPriceOracle());
   }
 
   function name() external view override returns (string memory) {
