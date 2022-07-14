@@ -5,6 +5,7 @@ coverage.json
 typechain
 .vscode
 package-lock.json
+data
 
 # hardhat files
 cache
