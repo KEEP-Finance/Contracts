@@ -281,6 +281,7 @@ contract LendingPoolConfigurator is ILendingPoolConfigurator {
     DataTypes.ReservePositionConfiguration memory currentPositionConfig = pool.getPositionConfiguration(asset);
     currentPositionConfig.active = true;
     pool.setPositionConfiguration(asset, currentPositionConfig);
+
     emit ReservePositionActivated(asset);
   }
 

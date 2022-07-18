@@ -210,10 +210,10 @@ library ValidationLogic {
       Errors.GetError(Errors.Error.VL_HEALTH_FACTOR_LOWER_THAN_LIQUIDATION_THRESHOLD)
     );
 
-    //add the current already borrowed amount to the amount requested to calculate the total collateral needed.
+    // add the current already borrowed amount to the amount requested to calculate the total collateral needed.
     vars.amountOfCollateralNeededETH = vars.userBorrowBalanceETH.add(amountInETH).percentDiv(
       vars.currentLtv
-    ); //LTV is calculated in percentage
+    ); // LTV is calculated in percentage
 
     require(
       vars.amountOfCollateralNeededETH <= vars.userCollateralBalanceETH,

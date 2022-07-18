@@ -254,7 +254,6 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
       _usersConfig[onBehalfOf].isBorrowing[reserve.id] = false;
     }
 
-    // NOTE: reduce complexity for frontend, as they need only approve once
     IERC20(asset).safeTransferFrom(msg.sender, address(this), paybackAmount);
     IERC20(asset).safeTransfer(kToken, paybackAmount);
 

@@ -52,6 +52,8 @@ contract PancakeswapRouterAdapter is IKSwapRouter, Ownable {
       deadline
     )[0];
     _amountOut = amountOut;
+    // TODO: check
+    IERC20(tokenIn).safeTransfer(recipient, IERC20(tokenIn).balanceOf(address(this)));
   }
 
   function SwapExactTokensForTokens(
