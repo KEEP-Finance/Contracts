@@ -783,7 +783,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     )
   {
     require(shortAsset != longAsset, Errors.GetError(Errors.Error.LP_POSITION_INVALID));
-    require((leverage < _maximumLeverage) && (leverage > 10**27), Errors.GetError(Errors.Error.LP_LEVERAGE_INVALID));
+    require((leverage < _maximumLeverage) && (leverage >= 10**27), Errors.GetError(Errors.Error.LP_LEVERAGE_INVALID));
 
     DataTypes.ReserveData storage shortReserve = _reserves[shortAsset];
 
