@@ -86,11 +86,11 @@ contract BorrowKeeper is KeeperCompatibleInterface {
         returns (bool runCheck)
     {
         (
-            uint256 totalCollateralETH,
-            uint256 totalDebtETH,
-            uint256 availableBorrowsETH,
-            uint256 currentLiquidationThreshold,
-            uint256 ltv,
+            /* uint256 totalCollateralETH */,
+            /* uint256 totalDebtETH */,
+            /* uint256 availableBorrowsETH */,
+            /* uint256 currentLiquidationThreshold */,
+            /* uint256 ltv */,
             uint256 healthFactor
         ) = LendingPool.getUserAccountData(userToCheck);
 

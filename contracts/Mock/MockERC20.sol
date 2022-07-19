@@ -41,7 +41,6 @@ contract MockERC20 is Context, IMockERC20 {
     uint8 private _decimals;
     address private mock_swap_address;
 
-    // Note: added decimals, and amo_address
     constructor (string memory name_, string memory symbol_, uint8 decimals_)  {
         _name = name_;
         _symbol = symbol_;
@@ -49,14 +48,10 @@ contract MockERC20 is Context, IMockERC20 {
         _mint(msg.sender, 10**25);
     }
 
-    function faucet(address spender) external override {
-        uint amount = 1000*10**_decimals;
-        _mint(msg.sender, amount);
-        approve(spender, amount);
-    }
-
-    function mint_to_user(uint256 amount, address user_address) external override {
-        _mint(user_address, amount);
+    function faucet(address spender, uint256 amount) external override {
+        uint _amount = amount * (10**_decimals);
+        _mint(msg.sender, _amount);
+        approve(spender, _amount);
     }
 
     /**

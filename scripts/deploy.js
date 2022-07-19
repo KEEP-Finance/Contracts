@@ -28,18 +28,23 @@ async function main() {
   const MockOracle = await hre.ethers.getContractFactory("MockPriceOracleGetter");
   let oracle = await MockOracle.deploy();
   await oracle.deployed();
-  // add rate (TODO)
-  await oracle.setAssetPrice(USDC.address, parseUnits("1", 25));
-  await oracle.setAssetPrice(ETH.address, parseUnits("1", 25));
-  await oracle.setAssetPrice(MATIC.address, parseUnits("1", 25));
+  // add rate
+  await oracle.setAssetPrice(USDC.address, parseUnits("6", 14));
+  await oracle.setAssetPrice(ETH.address, parseUnits("1", 18));
+  await oracle.setAssetPrice(MATIC.address, parseUnits("1", 14));
   console.log("Oracle address: ", oracle.address);
+
+  // TODO: 3.5. deploy swap
+  const MockSwap = await hre.ethers.getContractFactory("MockSwap");
+  let swapRouter = await MockSwap.deploy(oracle.address);
+  await swapRouter.deployed();
+  console.log("Swap Address: ", swapRouter.address);
 
   // 4. deploy address provider
   const LendingPoolAddressesProvider = await hre.ethers.getContractFactory("LendingPoolAddressesProvider");
-  let oneInchRouterAddress = "0x1111111254fb6c44bac0bed2854e76f90643097d";
-  let oneInchExecutorAddress = "0x521709b3cd7f07e29722be0ba28a8ce0e806dbc3";
+
   let address_provider = await LendingPoolAddressesProvider
-    .deploy(deployer.address, deployer.address, oracle.address, oneInchRouterAddress, oneInchExecutorAddress);
+    .deploy(deployer.address, deployer.address, oracle.address, swapRouter.address);
   await address_provider.deployed();
   console.log("Address provider address: ", address_provider.address);
   // get libraries
@@ -203,10 +208,6 @@ async function main() {
   await main_pool_configurator.setReserveFactor(USDC.address, 2000);
   await main_pool_configurator.setReserveFactor(MATIC.address, 2000);
   console.log("reserve factor: main pool")
-  await main_pool_configurator.activateReserve(ETH.address);
-  await main_pool_configurator.activateReserve(USDC.address);
-  await main_pool_configurator.activateReserve(MATIC.address);
-  console.log("reserve activated: main pool")
 
   // 11. init ETH, USDC on ETH-USDC pool
   await eth_usdc_pool_configurator.initReserve(
@@ -235,17 +236,22 @@ async function main() {
   await eth_usdc_pool_configurator.setReserveFactor(ETH.address, 2000);
   await eth_usdc_pool_configurator.setReserveFactor(USDC.address, 2000);
   console.log("reserve factor: eth-usdc pool")
-  await eth_usdc_pool_configurator.activateReserve(ETH.address);
-  await eth_usdc_pool_configurator.activateReserve(USDC.address);
-  console.log("reserve activated: eth-usdc pool")
   console.log("reserve done")
+
+  // 12. enable position on main pool reserves
+  await main_pool_configurator.configureReservePosition(ETH.address, true, true, true);
+  await main_pool_configurator.configureReservePosition(USDC.address, true, true, true);
+  await main_pool_configurator.configureReservePosition(MATIC.address, true, true, true);
+  await main_pool_configurator.activateReservePosition(ETH.address);
+  await main_pool_configurator.activateReservePosition(USDC.address);
+  await main_pool_configurator.activateReservePosition(MATIC.address);
   
-  // 12. unpause the pool
+  // 13. unpause the pool
   await main_pool_configurator.setPoolPause(false);
   await eth_usdc_pool_configurator.setPoolPause(false);
   console.log("pools activated")
 
-  // 13. readers
+  // 14. readers
   const DataProvider = await hre.ethers.getContractFactory("DataProvider");
   let data_provider = await DataProvider.deploy(address_provider.address);
   await data_provider.deployed();
@@ -255,6 +261,10 @@ async function main() {
   await USDC.approve(main_pool.address, parseUnits("1", 50));
   await ETH.approve(main_pool.address, parseUnits("1", 50));
   await MATIC.approve(main_pool.address, parseUnits("1", 50));
+
+  await main_pool.deposit(ETH.address, parseUnits("1", 20), deployer.address)
+  await main_pool.setUserUseReserveAsCollateral(ETH.address, true)
+  await main_pool.borrow(ETH.address, parseUnits("1", 18), 1, deployer.address)
 }
 
 // We recommend this pattern to be able to use async/await everywhere

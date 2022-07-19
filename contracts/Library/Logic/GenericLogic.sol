@@ -40,9 +40,10 @@ library GenericLogic {
     mapping(address => DataTypes.ReserveData) storage reservesData,
     address oracle
   ) external view returns (uint256 amountToShort) {
-    uint256 supplyUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(supplyTokenAddress);
+    IPriceOracleGetter _oracle = IPriceOracleGetter(oracle);
+    uint256 supplyUnitPrice = _oracle.getAssetPrice(supplyTokenAddress);
     uint8 supplyDecimals = reservesData[supplyTokenAddress].configuration.decimals;
-    uint256 shortUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(borrowTokenAddress);
+    uint256 shortUnitPrice = _oracle.getAssetPrice(borrowTokenAddress);
     uint8 shortDecimals = reservesData[borrowTokenAddress].configuration.decimals;
 
     amountToShort = supplyTokenAmount.mul(supplyUnitPrice).mul(10**shortDecimals);
@@ -58,11 +59,12 @@ library GenericLogic {
     view
     returns (int256 pnl)
   {
-    uint256 shortUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(position.shortTokenAddress);
+    IPriceOracleGetter _oracle = IPriceOracleGetter(oracle);
+    uint256 shortUnitPrice = _oracle.getAssetPrice(position.shortTokenAddress);
     uint8 shortDecimals = reservesData[position.shortTokenAddress].configuration.decimals;
     uint256 shortValue = shortUnitPrice.mul(position.shortAmount).div(10**shortDecimals);
 
-    uint256 longUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(position.longTokenAddress);
+    uint256 longUnitPrice = _oracle.getAssetPrice(position.longTokenAddress);
     uint8 longDecimals = reservesData[position.longTokenAddress].configuration.decimals;
     uint256 longValue = longUnitPrice.mul(position.longAmount).div(10**longDecimals);
     
@@ -85,19 +87,19 @@ library GenericLogic {
     uint256 shortValue;
     uint256 longValue;
     uint256 marginValue;
-
+    IPriceOracleGetter _oracle = IPriceOracleGetter(oracle);
     {
-      uint256 shortUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(position.shortTokenAddress);
+      uint256 shortUnitPrice = _oracle.getAssetPrice(position.shortTokenAddress);
       uint8 shortDecimals = reservesData[position.shortTokenAddress].configuration.decimals;
       shortValue = shortUnitPrice.mul(position.shortAmount).div(10**shortDecimals);
     }
     {    
-      uint256 longUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(position.longTokenAddress);
+      uint256 longUnitPrice = _oracle.getAssetPrice(position.longTokenAddress);
       uint8 longDecimals = reservesData[position.longTokenAddress].configuration.decimals;
       longValue = longUnitPrice.mul(position.longAmount).div(10**longDecimals);
     }
     {
-      uint256 marginUnitPrice = IPriceOracleGetter(oracle).getAssetPrice(position.collateralTokenAddress);
+      uint256 marginUnitPrice = _oracle.getAssetPrice(position.collateralTokenAddress);
       uint8 marginDecimals = reservesData[position.collateralTokenAddress].configuration.decimals;
       marginValue = marginUnitPrice.mul(position.collateralAmount).div(10**marginDecimals);
     }

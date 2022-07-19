@@ -56,6 +56,12 @@ interface ILendingPoolConfigurator {
     uint256 liquidationBonus
   );
 
+  event PositionConfigurationChanged(
+    bool collateralEnabled,
+    bool longEnabled,
+    bool shortEnabled
+  );
+
   /**
    * @dev Emitted when a reserve is activated
    * @param asset The address of the underlying asset of the reserve
@@ -100,4 +106,16 @@ interface ILendingPoolConfigurator {
    * @param strategy The new address of the interest strategy contract
    **/
   event ReserveInterestRateStrategyChanged(address indexed asset, address strategy);
+
+  /**
+   * @dev Emitted when a reserve is activated for margin trading
+   * @param asset The address of the underlying asset of the reserve
+   **/
+  event ReservePositionActivated(address indexed asset);
+
+  /**
+   * @dev Emitted when a reserve is deactivated for margin trading
+   * @param asset The address of the underlying asset of the reserve
+   **/
+  event ReservePositionDeactivated(address indexed asset);
 }

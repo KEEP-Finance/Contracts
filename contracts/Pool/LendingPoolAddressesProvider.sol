@@ -19,27 +19,23 @@ contract LendingPoolAddressesProvider is Ownable, ILendingPoolAddressesProvider 
   bytes32 private constant EMERGENCY_ADMIN = 'EMERGENCY_ADMIN';
   bytes32 private constant PRICE_ORACLE = 'PRICE_ORACLE';
   bytes32 private constant SWAP_ROUTER = 'SWAP_ROUTER';
-  bytes32 private constant ONEINCH_ROUTER = 'ONEINCH_ROUTER';
-  bytes32 private constant ONEINCH_EXECUTOR = 'ONEINCH_EXECUTOR';
 
-  address[] private lending_pool_array;
-  mapping(address => uint) private lending_pool_id;
-  mapping(address => address) private lending_pool_configurator_mapping;
-  mapping(address => address) private lending_pool_cm_mapping;
-  mapping(address => bool) private lending_pool_valid;
+  address[] private lendingPoolAddressArray;
+  mapping(address => uint) private lendingPoolID;
+  mapping(address => address) private lendingPoolConfigurator;
+  mapping(address => address) private lendingPoolCollateralManager;
+  mapping(address => bool) private lendingPoolValid;
 
   constructor(
     address main_admin,
     address emergency_admin,
     address oracle,
-    address swapRouterAddr_,
-    address swapExecutorAddr_
+    address swapRouterAddr_
   ) {
     _addresses[MAIN_ADMIN] = main_admin;
     _addresses[EMERGENCY_ADMIN] = emergency_admin;
     _addresses[PRICE_ORACLE] = oracle;
-    _addresses[ONEINCH_ROUTER] = swapRouterAddr_;
-    _addresses[ONEINCH_EXECUTOR] = swapExecutorAddr_;
+    _addresses[SWAP_ROUTER] = swapRouterAddr_;
   }
 
   function _add_lending_pool(
@@ -47,30 +43,30 @@ contract LendingPoolAddressesProvider is Ownable, ILendingPoolAddressesProvider 
     address lending_pool_configurator_address,
     address lending_pool_cm_address
   ) internal {
-    require(lending_pool_valid[lending_pool_address] != true, Errors.GetError(Errors.Error.LENDING_POOL_EXIST));
-    lending_pool_valid[lending_pool_address] = true;
-    lending_pool_id[lending_pool_address] = lending_pool_array.length;
-    lending_pool_array.push(lending_pool_address);
-    lending_pool_configurator_mapping[lending_pool_address] = lending_pool_configurator_address;
-    lending_pool_cm_mapping[lending_pool_address] = lending_pool_cm_address;
+    require(lendingPoolValid[lending_pool_address] != true, Errors.GetError(Errors.Error.LENDING_POOL_EXIST));
+    lendingPoolValid[lending_pool_address] = true;
+    lendingPoolID[lending_pool_address] = lendingPoolAddressArray.length;
+    lendingPoolAddressArray.push(lending_pool_address);
+    lendingPoolConfigurator[lending_pool_address] = lending_pool_configurator_address;
+    lendingPoolCollateralManager[lending_pool_address] = lending_pool_cm_address;
     emit PoolAdded(lending_pool_address, lending_pool_configurator_address, lending_pool_cm_address);
   }
 
   function _remove_lending_pool(address lending_pool_address) internal {
-    require(lending_pool_valid[lending_pool_address] == true, Errors.GetError(Errors.Error.LENDING_POOL_NONEXIST));
-    delete lending_pool_valid[lending_pool_address];
-    delete lending_pool_configurator_mapping[lending_pool_address];
-    delete lending_pool_cm_mapping[lending_pool_address];
-    delete lending_pool_id[lending_pool_address];
+    require(lendingPoolValid[lending_pool_address] == true, Errors.GetError(Errors.Error.LENDING_POOL_NONEXIST));
+    delete lendingPoolValid[lending_pool_address];
+    delete lendingPoolConfigurator[lending_pool_address];
+    delete lendingPoolCollateralManager[lending_pool_address];
+    delete lendingPoolID[lending_pool_address];
     emit PoolRemoved(lending_pool_address);
   }
 
   function getAllPools() external override view returns (address[] memory) {
-    uint pool_length = lending_pool_array.length;
+    uint pool_length = lendingPoolAddressArray.length;
     uint pool_number = 0;
     for (uint i = 0; i < pool_length; i++) {
-        address curr_pool_address = lending_pool_array[i];
-        if (lending_pool_valid[curr_pool_address] == true) {
+        address curr_pool_address = lendingPoolAddressArray[i];
+        if (lendingPoolValid[curr_pool_address] == true) {
             pool_number = pool_number + 1;
         }
     }
@@ -78,8 +74,8 @@ contract LendingPoolAddressesProvider is Ownable, ILendingPoolAddressesProvider 
 
     uint idx = 0;
     for (uint i = 0; i < pool_length; i++) {
-        address curr_pool_address = lending_pool_array[i];
-        if (lending_pool_valid[curr_pool_address] == true) {
+        address curr_pool_address = lendingPoolAddressArray[i];
+        if (lendingPoolValid[curr_pool_address] == true) {
             all_pools[idx] = curr_pool_address;
             idx = idx + 1;
         }
@@ -104,19 +100,19 @@ contract LendingPoolAddressesProvider is Ownable, ILendingPoolAddressesProvider 
    * @return The LendingPool proxy address
    **/
   function getLendingPool(uint id) external view override returns (address, bool) {
-    return (lending_pool_array[id], lending_pool_valid[lending_pool_array[id]]);
+    return (lendingPoolAddressArray[id], lendingPoolValid[lendingPoolAddressArray[id]]);
   }
 
   function getLendingPoolID(address pool) external view override returns (uint) {
-    return lending_pool_id[pool];
+    return lendingPoolID[pool];
   }
 
   function getLendingPoolConfigurator(address pool) external view override returns (address) {
-    return lending_pool_configurator_mapping[pool];
+    return lendingPoolConfigurator[pool];
   }
 
   function getLendingPoolCollateralManager(address pool) external view override returns (address) {
-    return lending_pool_cm_mapping[pool];
+    return lendingPoolCollateralManager[pool];
   }
 
   /**
@@ -124,10 +120,10 @@ contract LendingPoolAddressesProvider is Ownable, ILendingPoolAddressesProvider 
    * @param pool The new LendingPool implementation
    **/
   function setLendingPool(uint id, address pool, address lending_pool_configurator_address, address cm_address) external override onlyOwner {
-    lending_pool_array[id] = pool;
-    lending_pool_valid[pool] = true;
-    lending_pool_configurator_mapping[pool] = lending_pool_configurator_address;
-    lending_pool_cm_mapping[pool] = cm_address;
+    lendingPoolAddressArray[id] = pool;
+    lendingPoolValid[pool] = true;
+    lendingPoolConfigurator[pool] = lending_pool_configurator_address;
+    lendingPoolCollateralManager[pool] = cm_address;
     emit LendingPoolUpdated(id, pool, lending_pool_configurator_address, cm_address);
   }
 
@@ -192,7 +188,4 @@ contract LendingPoolAddressesProvider is Ownable, ILendingPoolAddressesProvider 
     emit SwapRouterUpdated(swapRouter);
   }
 
-  function getOneInch() external view override returns (address, address) {
-    return (_addresses[ONEINCH_ROUTER], _addresses[ONEINCH_EXECUTOR]);
-  }
 }

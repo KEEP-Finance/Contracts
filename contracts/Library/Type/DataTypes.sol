@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 library DataTypes {
   struct ReserveData {
     ReserveConfiguration configuration;
+    ReservePositionConfiguration positionConfiguration;
     // the liquidity index. Expressed in ray
     uint128 liquidityIndex;
     // (variable) borrow index. Expressed in ray
@@ -47,6 +48,17 @@ library DataTypes {
     // uint256 data;
     mapping(uint256 => bool) isUsingAsCollateral;
     mapping(uint256 => bool) isBorrowing;
+  }
+
+  struct ReservePositionConfiguration {
+    // position-related is active
+    bool active;
+    // position collateral is enabled
+    bool collateralEnabled;
+    // position long is enabled
+    bool longEnabled;
+    // position short is enabled
+    bool shortEnabled;
   }
 
   struct TraderPosition {

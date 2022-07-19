@@ -20,29 +20,34 @@ library ValidationLogic {
   using SafeERC20 for IERC20;
 
   function validateOpenPosition(
-    DataTypes.ReserveData storage marginReserve,
-    DataTypes.ReserveData storage borrowedReserve,
-    DataTypes.ReserveData storage heldReserve,
+    DataTypes.ReserveData storage collateralReserve,
+    DataTypes.ReserveData storage shortReserve,
+    DataTypes.ReserveData storage longReserve,
     uint256 collateralAmount,
     uint256 amountToShort
   ) external view {
     require(collateralAmount != 0, Errors.GetError(Errors.Error.VL_INVALID_AMOUNT));
-    require(marginReserve.configuration.active, Errors.GetError(Errors.Error.VL_NO_ACTIVE_RESERVE));
-    require(!marginReserve.configuration.frozen, Errors.GetError(Errors.Error.VL_RESERVE_FROZEN));
+    require(collateralReserve.configuration.active, Errors.GetError(Errors.Error.VL_NO_ACTIVE_RESERVE));
+    require(!collateralReserve.configuration.frozen, Errors.GetError(Errors.Error.VL_RESERVE_FROZEN));
+    require(collateralReserve.positionConfiguration.active, Errors.GetError(Errors.Error.VL_NO_ACTIVE_RESERVE_POSITION));
+    require(collateralReserve.positionConfiguration.collateralEnabled, Errors.GetError(Errors.Error.VL_POSITION_COLLATERAL_NOT_ENABLED));
 
-    require(heldReserve.configuration.active, Errors.GetError(Errors.Error.VL_NO_ACTIVE_RESERVE));
-    require(!heldReserve.configuration.frozen, Errors.GetError(Errors.Error.VL_RESERVE_FROZEN));
+    require(longReserve.configuration.active, Errors.GetError(Errors.Error.VL_NO_ACTIVE_RESERVE));
+    require(!longReserve.configuration.frozen, Errors.GetError(Errors.Error.VL_RESERVE_FROZEN));
+    require(longReserve.positionConfiguration.active, Errors.GetError(Errors.Error.VL_NO_ACTIVE_RESERVE_POSITION));
+    require(longReserve.positionConfiguration.longEnabled, Errors.GetError(Errors.Error.VL_POSITION_LONG_NOT_ENABLED));
 
-    require(borrowedReserve.configuration.active, Errors.GetError(Errors.Error.VL_NO_ACTIVE_RESERVE));
-    require(!borrowedReserve.configuration.frozen, Errors.GetError(Errors.Error.VL_RESERVE_FROZEN));
+    require(shortReserve.configuration.active, Errors.GetError(Errors.Error.VL_NO_ACTIVE_RESERVE));
+    require(!shortReserve.configuration.frozen, Errors.GetError(Errors.Error.VL_RESERVE_FROZEN));
     require(amountToShort != 0, Errors.GetError(Errors.Error.VL_INVALID_AMOUNT));
-    require(borrowedReserve.configuration.borrowingEnabled, Errors.GetError(Errors.Error.VL_BORROWING_NOT_ENABLED));
+    require(shortReserve.positionConfiguration.active, Errors.GetError(Errors.Error.VL_NO_ACTIVE_RESERVE_POSITION));
+    require(shortReserve.positionConfiguration.shortEnabled, Errors.GetError(Errors.Error.VL_POSITION_SHORT_NOT_ENABLED));
+    require(shortReserve.configuration.borrowingEnabled, Errors.GetError(Errors.Error.VL_BORROWING_NOT_ENABLED));
   }
 
   function validateClosePosition(
     address traderAddress,
-    DataTypes.TraderPosition storage position,
-    address paymentAddress
+    DataTypes.TraderPosition storage position
   ) external view {
     address positionTrader = position.traderAddress;
 
@@ -52,14 +57,12 @@ library ValidationLogic {
 
   function validateLiquidationCallPosition(
     DataTypes.TraderPosition storage position,
-    address paymentAddress,
     mapping(address => DataTypes.ReserveData) storage reservesData,
     address oracle
   ) external view {
     require(position.isOpen == true, Errors.GetError(Errors.Error.VL_POSITION_NOT_OPEN));
     uint256 positionLiquidationThreshold = position.liquidationThreshold;
-    uint256 healthFactor 
-      = GenericLogic
+    uint256 healthFactor = GenericLogic
       .calculatePositionHealthFactor(
         position,
         positionLiquidationThreshold,
@@ -205,10 +208,10 @@ library ValidationLogic {
       Errors.GetError(Errors.Error.VL_HEALTH_FACTOR_LOWER_THAN_LIQUIDATION_THRESHOLD)
     );
 
-    //add the current already borrowed amount to the amount requested to calculate the total collateral needed.
+    // add the current already borrowed amount to the amount requested to calculate the total collateral needed.
     vars.amountOfCollateralNeededETH = vars.userBorrowBalanceETH.add(amountInETH).percentDiv(
       vars.currentLtv
-    ); //LTV is calculated in percentage
+    ); // LTV is calculated in percentage
 
     require(
       vars.amountOfCollateralNeededETH <= vars.userCollateralBalanceETH,

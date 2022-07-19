@@ -34,6 +34,11 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     _;
   }
 
+  modifier whenPositionNotPaused() {
+    _whenPositionNotPaused();
+    _;
+  }
+
   modifier onlyLendingPoolConfigurator() {
     _onlyLendingPoolConfigurator();
     _;
@@ -41,6 +46,10 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
 
   function _whenNotPaused() internal view {
     require(!_paused, Errors.GetError(Errors.Error.LP_IS_PAUSED));
+  }
+
+  function _whenPositionNotPaused() internal view {
+    require(!_positionIsPaused, Errors.GetError(Errors.Error.LP_POSITION_IS_PAUSED));
   }
 
   function _onlyLendingPoolConfigurator() internal view {
@@ -55,9 +64,9 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     string memory poolName
   ) {
     _addressesProvider = provider;
-    _maxNumberOfReserves = type(uint256).max;
-    _maximumLeverage = 20 * (10**27);
-    _positionLiquidationThreshold = 2 * (10**25);
+    _maxNumberOfReserves = type(uint256).max; // unlimit reserve number at first
+    _maximumLeverage = 20 * (10**27); // 20 ray
+    _positionLiquidationThreshold = 2 * (10**25); // 0.02 ray
     _name = poolName;
   }
 
@@ -148,7 +157,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
       emit ReserveUsedAsCollateralDisabled(asset, msg.sender);
     }
 
-    // NOTE (Gary): transfer asset operation is in this burn function
+    // transfer asset operation is in this burn function
     IKToken(kToken).burn(msg.sender, to, amountToWithdraw, reserve.liquidityIndex);
 
     emit Withdraw(asset, msg.sender, to, amountToWithdraw);
@@ -184,9 +193,17 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
         onBehalfOf,
         amount,
         interestRateMode,
-        reserve.kTokenAddress,
         true
       )
+    );
+
+    emit Borrow(
+      asset,
+      msg.sender,
+      onBehalfOf,
+      amount,
+      interestRateMode,
+      reserve.currentBorrowRate
     );
   }
 
@@ -245,7 +262,6 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
       _usersConfig[onBehalfOf].isBorrowing[reserve.id] = false;
     }
 
-    // NOTE: reduce complexity for frontend, as they need only approve once
     IERC20(asset).safeTransferFrom(msg.sender, address(this), paybackAmount);
     IERC20(asset).safeTransfer(kToken, paybackAmount);
 
@@ -400,6 +416,15 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     returns (DataTypes.ReserveConfiguration memory)
   {
     return _reserves[asset].configuration;
+  }
+
+  function getPositionConfiguration(address asset)
+    external
+    view
+    override
+    returns (DataTypes.ReservePositionConfiguration memory)
+  {
+    return _reserves[asset].positionConfiguration;
   }
 
   /**
@@ -608,6 +633,17 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     _reserves[asset].configuration = configuration;
   }
 
+  function setPositionConfiguration(
+    address asset,
+    DataTypes.ReservePositionConfiguration calldata positionConfig
+  )
+    external
+    override
+    onlyLendingPoolConfigurator
+  {
+    _reserves[asset].positionConfiguration = positionConfig;
+  }
+
   /**
    * @dev Set the _pause state of a reserve
    * - Only callable by the LendingPoolConfigurator contract
@@ -628,7 +664,6 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     address onBehalfOf;
     uint256 amount;
     uint256 interestRateMode;
-    address kTokenAddress;
     bool releaseUnderlying;
   }
 
@@ -673,25 +708,18 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
       userConfig.isBorrowing[reserve.id] = true;
     }
 
+    address kToken = reserve.kTokenAddress;
+
     reserve.updateInterestRates(
       vars.asset,
-      vars.kTokenAddress,
+      kToken,
       0,
       vars.releaseUnderlying ? vars.amount : 0
     );
 
     if (vars.releaseUnderlying) {
-      IKToken(vars.kTokenAddress).transferUnderlyingTo(vars.user, vars.amount);
+      IKToken(kToken).transferUnderlyingTo(vars.user, vars.amount);
     }
-
-    emit Borrow(
-      vars.asset,
-      vars.user,
-      vars.onBehalfOf,
-      vars.amount,
-      vars.interestRateMode,
-      reserve.currentBorrowRate
-    );
   }
 
   function _addReserveToList(address asset) internal {
@@ -749,9 +777,11 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
   )
     external
     whenNotPaused
+    whenPositionNotPaused
     returns (
       DataTypes.TraderPosition memory position
-    ) {
+    )
+  {
     require(shortAsset != longAsset, Errors.GetError(Errors.Error.LP_POSITION_INVALID));
     require((leverage < _maximumLeverage) && (leverage > 10**27), Errors.GetError(Errors.Error.LP_LEVERAGE_INVALID));
 
@@ -782,12 +812,20 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     // if this fails, means there is not enough balance
     IKToken(shortReserve.kTokenAddress).transferUnderlyingTo(address(this), amountToShort);
 
-    // transfer borrowedToken into heldToken through dex (1inch)
+    // transfer short into long through dex
+    // TODO: validate after swap
+    // TODO: mock swap
     uint256 longAmount;
     {
-      
+      IKSwapRouter swapRouter = IKSwapRouter(_addressesProvider.getSwapRouter());
+      IERC20(shortAsset).safeTransfer(address(swapRouter), amountToShort);
+      (, longAmount) = swapRouter.SwapExactTokensForTokens(
+        shortAsset,
+        longAsset,
+        amountToShort,
+        address(this)
+      );
     }
-    longAmount = amountToShort;
 
     position = DataTypes.TraderPosition(
       // the trader
@@ -845,13 +883,15 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     external
     override
     whenNotPaused
+    whenPositionNotPaused
     returns (
       uint256 paymentAmount,
       int256 pnl
-    ) {
+    )
+  {
     DataTypes.TraderPosition storage position = _positionsList[id];
     address shortTokenAddress = position.shortTokenAddress;
-    ValidationLogic.validateClosePosition(msg.sender, position, shortTokenAddress);
+    ValidationLogic.validateClosePosition(msg.sender, position);
 
     pnl = GenericLogic.getPnL(position, _reserves, _addressesProvider.getPriceOracle());
 
@@ -877,12 +917,12 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     external
     override
     whenNotPaused
+    whenPositionNotPaused
   {
     DataTypes.TraderPosition storage position = _positionsList[id];
 
     ValidationLogic.validateLiquidationCallPosition(
         position,
-        position.shortTokenAddress,
         _reserves,
         _addressesProvider.getPriceOracle()
       );
@@ -927,7 +967,6 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
         if (position.shortAmount < returnShortAmount) {
           
         }
-        
         paymentAmount.add(position.collateralAmount);
       } else {
         
@@ -950,16 +989,17 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
       );
     }
     {
-      shortReserve.updateInterestRates(position.shortTokenAddress, shortReserve.kTokenAddress, paybackAmount, 0);
+      address kToken = shortReserve.kTokenAddress;
+      shortReserve.updateInterestRates(position.shortTokenAddress, kToken, paybackAmount, 0);
 
       uint256 variableDebt = IERC20(position.shortTokenAddress).balanceOf(pool);
       if (variableDebt.sub(paybackAmount) == 0) {
         _usersConfig[pool].isBorrowing[shortReserve.id] = false;
       }
 
-      IERC20(position.shortTokenAddress).safeTransfer(shortReserve.kTokenAddress, paybackAmount);
+      IERC20(position.shortTokenAddress).safeTransfer(kToken, paybackAmount);
 
-      IKToken(shortReserve.kTokenAddress).handleRepayment(pool, paybackAmount);
+      IKToken(kToken).handleRepayment(pool, paybackAmount);
     }
     {
       _positionsList[position.id].isOpen = false;
@@ -1022,7 +1062,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
   ) {
     DataTypes.TraderPosition storage position = _positionsList[id];
     pnl = GenericLogic.getPnL(position, _reserves, _addressesProvider.getPriceOracle());
-    healthFactor = GenericLogic.calculatePositionHealthFactor(position, _positionLiquidationThreshold, _reserves, _addressesProvider.getPriceOracle());
+    healthFactor = GenericLogic.calculatePositionHealthFactor(position, position.liquidationThreshold, _reserves, _addressesProvider.getPriceOracle());
   }
 
   function name() external view override returns (string memory) {
