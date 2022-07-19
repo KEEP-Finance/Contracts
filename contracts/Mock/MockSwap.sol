@@ -16,6 +16,7 @@ contract MockSwap is IKSwapRouter {
     _oracle = IPriceOracleGetter(oracle);
   }
 
+  // NOTE: in mockSwap this function is not used, and is incomplete
   function SwapTokensForExactTokens(
     address tokenIn,
     address tokenOut,
@@ -24,10 +25,9 @@ contract MockSwap is IKSwapRouter {
   ) external override returns (uint256 _amountIn, uint256 _amountOut) {
     IMockERC20(tokenOut).faucet(address(this), amountOut);
     _amountIn = 10**IMockERC20(tokenIn).decimals();
-    _amountIn = (_amountIn * amountOut * _oracle.getAssetPrice(tokenOut)).wadDiv(_oracle.getAssetPrice(tokenIn));
+    _amountIn = (_amountIn * amountOut * _oracle.getAssetPrice(tokenOut)) / _oracle.getAssetPrice(tokenIn);
     _amountIn = _amountIn / (10**IMockERC20(tokenOut).decimals());
     _amountOut = amountOut;
-    IMockERC20(tokenIn).transfer(recipient, IMockERC20(tokenIn).balanceOf(address(this)));
     IMockERC20(tokenOut).transfer(recipient, amountOut);
   }
 
@@ -39,7 +39,7 @@ contract MockSwap is IKSwapRouter {
   ) external override returns (uint256 _amountIn, uint256 _amountOut) {
     
     _amountOut = 10**IMockERC20(tokenOut).decimals();
-    _amountOut = (_amountOut * amountIn * _oracle.getAssetPrice(tokenIn)).wadDiv(_oracle.getAssetPrice(tokenOut));
+    _amountOut = (_amountOut * amountIn * _oracle.getAssetPrice(tokenIn)) / _oracle.getAssetPrice(tokenOut);
     _amountOut = _amountOut / (10**IMockERC20(tokenIn).decimals());
     _amountIn = amountIn;
     IMockERC20(tokenOut).faucet(address(this), _amountOut);

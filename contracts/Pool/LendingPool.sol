@@ -157,7 +157,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
       emit ReserveUsedAsCollateralDisabled(asset, msg.sender);
     }
 
-    // NOTE (Gary): transfer asset operation is in this burn function
+    // transfer asset operation is in this burn function
     IKToken(kToken).burn(msg.sender, to, amountToWithdraw, reserve.liquidityIndex);
 
     emit Withdraw(asset, msg.sender, to, amountToWithdraw);
@@ -193,9 +193,17 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
         onBehalfOf,
         amount,
         interestRateMode,
-        reserve.kTokenAddress,
         true
       )
+    );
+
+    emit Borrow(
+      asset,
+      msg.sender,
+      onBehalfOf,
+      amount,
+      interestRateMode,
+      reserve.currentBorrowRate
     );
   }
 
@@ -656,7 +664,6 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     address onBehalfOf;
     uint256 amount;
     uint256 interestRateMode;
-    address kTokenAddress;
     bool releaseUnderlying;
   }
 
@@ -701,25 +708,18 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
       userConfig.isBorrowing[reserve.id] = true;
     }
 
+    address kToken = reserve.kTokenAddress;
+
     reserve.updateInterestRates(
       vars.asset,
-      vars.kTokenAddress,
+      kToken,
       0,
       vars.releaseUnderlying ? vars.amount : 0
     );
 
     if (vars.releaseUnderlying) {
-      IKToken(vars.kTokenAddress).transferUnderlyingTo(vars.user, vars.amount);
+      IKToken(kToken).transferUnderlyingTo(vars.user, vars.amount);
     }
-
-    emit Borrow(
-      vars.asset,
-      vars.user,
-      vars.onBehalfOf,
-      vars.amount,
-      vars.interestRateMode,
-      reserve.currentBorrowRate
-    );
   }
 
   function _addReserveToList(address asset) internal {
@@ -891,7 +891,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
   {
     DataTypes.TraderPosition storage position = _positionsList[id];
     address shortTokenAddress = position.shortTokenAddress;
-    ValidationLogic.validateClosePosition(msg.sender, position, shortTokenAddress);
+    ValidationLogic.validateClosePosition(msg.sender, position);
 
     pnl = GenericLogic.getPnL(position, _reserves, _addressesProvider.getPriceOracle());
 
@@ -923,7 +923,6 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
 
     ValidationLogic.validateLiquidationCallPosition(
         position,
-        position.shortTokenAddress,
         _reserves,
         _addressesProvider.getPriceOracle()
       );
@@ -982,7 +981,6 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
             address(this)
           );
         }
-        
         paymentAmount.add(position.collateralAmount);
       } else {
         IERC20(position.longTokenAddress)
@@ -1012,16 +1010,17 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
       );
     }
     {
-      shortReserve.updateInterestRates(position.shortTokenAddress, shortReserve.kTokenAddress, paybackAmount, 0);
+      address kToken = shortReserve.kTokenAddress;
+      shortReserve.updateInterestRates(position.shortTokenAddress, kToken, paybackAmount, 0);
 
       uint256 variableDebt = IERC20(position.shortTokenAddress).balanceOf(pool);
       if (variableDebt.sub(paybackAmount) == 0) {
         _usersConfig[pool].isBorrowing[shortReserve.id] = false;
       }
 
-      IERC20(position.shortTokenAddress).safeTransfer(shortReserve.kTokenAddress, paybackAmount);
+      IERC20(position.shortTokenAddress).safeTransfer(kToken, paybackAmount);
 
-      IKToken(shortReserve.kTokenAddress).handleRepayment(pool, paybackAmount);
+      IKToken(kToken).handleRepayment(pool, paybackAmount);
     }
     {
       _positionsList[position.id].isOpen = false;

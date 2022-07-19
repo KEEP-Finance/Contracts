@@ -237,13 +237,21 @@ async function main() {
   await eth_usdc_pool_configurator.setReserveFactor(USDC.address, 2000);
   console.log("reserve factor: eth-usdc pool")
   console.log("reserve done")
+
+  // 12. enable position on main pool reserves
+  await main_pool_configurator.configureReservePosition(ETH.address, true, true, true);
+  await main_pool_configurator.configureReservePosition(USDC.address, true, true, true);
+  await main_pool_configurator.configureReservePosition(MATIC.address, true, true, true);
+  await main_pool_configurator.activateReservePosition(ETH.address);
+  await main_pool_configurator.activateReservePosition(USDC.address);
+  await main_pool_configurator.activateReservePosition(MATIC.address);
   
-  // 12. unpause the pool
+  // 13. unpause the pool
   await main_pool_configurator.setPoolPause(false);
   await eth_usdc_pool_configurator.setPoolPause(false);
   console.log("pools activated")
 
-  // 13. readers
+  // 14. readers
   const DataProvider = await hre.ethers.getContractFactory("DataProvider");
   let data_provider = await DataProvider.deploy(address_provider.address);
   await data_provider.deployed();

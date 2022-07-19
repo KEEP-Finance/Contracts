@@ -47,8 +47,7 @@ library ValidationLogic {
 
   function validateClosePosition(
     address traderAddress,
-    DataTypes.TraderPosition storage position,
-    address paymentAddress
+    DataTypes.TraderPosition storage position
   ) external view {
     address positionTrader = position.traderAddress;
 
@@ -58,7 +57,6 @@ library ValidationLogic {
 
   function validateLiquidationCallPosition(
     DataTypes.TraderPosition storage position,
-    address paymentAddress,
     mapping(address => DataTypes.ReserveData) storage reservesData,
     address oracle
   ) external view {
