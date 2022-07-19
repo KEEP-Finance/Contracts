@@ -265,6 +265,10 @@ async function main() {
   await main_pool.deposit(ETH.address, parseUnits("1", 20), deployer.address)
   await main_pool.setUserUseReserveAsCollateral(ETH.address, true)
   await main_pool.borrow(ETH.address, parseUnits("1", 18), 1, deployer.address)
+  // test position
+  await main_pool.openPosition(USDC.address, ETH.address, USDC.address, parseUnits("1", 6), parseUnits("5", 27));
+  let data1 = await main_pool.getTraderPositions(deployer.address);
+  console.log(data1)
 }
 
 // We recommend this pattern to be able to use async/await everywhere

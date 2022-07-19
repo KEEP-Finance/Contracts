@@ -814,7 +814,6 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
 
     // transfer short into long through dex
     // TODO: validate after swap
-    // TODO: mock swap
     uint256 longAmount;
     {
       IKSwapRouter swapRouter = IKSwapRouter(_addressesProvider.getSwapRouter());
