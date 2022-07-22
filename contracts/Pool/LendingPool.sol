@@ -17,6 +17,7 @@ import {SafeMath} from '../Dependency/openzeppelin/SafeMath.sol';
 import {SafeERC20} from '../Dependency/openzeppelin/SafeERC20.sol';
 import {LendingPoolStorage} from './LendingPoolStorage.sol';
 import {ILendingPoolAddressesProvider} from '../Interface/ILendingPoolAddressesProvider.sol';
+import {IFlashLoanReceiver} from '../Interface/IFlashLoanReceiver.sol';
 import {DataTypes} from '../Library/Type/DataTypes.sol';
 import {GenericLogic} from '../Library/Logic/GenericLogic.sol';
 import {LiquidationLogic} from '../Library/Logic/LiquidationLogic.sol';
@@ -198,6 +199,84 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
       );
     return paybackAmount;
   }
+  
+  struct FlashLoanLocalVars {
+    IFlashLoanReceiver receiver;
+    uint256 i;
+    address currentAsset;
+    address currentKTokenAddress;
+    uint256 currentAmount;
+    uint256 currentPremium;
+    uint256 currentAmountPlusPremium;
+  }
+
+  /// @inheritdoc ILendingPool
+  function flashLoan(
+    address receiverAddress,
+    address[] calldata assets,
+    uint256[] calldata amounts,
+    address onBehalfOf,
+    bytes calldata params,
+    uint16 referralCode
+  ) external override whenNotPaused {
+    FlashLoanLocalVars memory vars;
+
+    ValidationLogic.validateFlashloan(assets, amounts);
+
+    address[] memory kTokenAddresses = new address[](assets.length);
+    uint256[] memory premiums = new uint256[](assets.length);
+
+    vars.receiver = IFlashLoanReceiver(receiverAddress);
+
+    for (vars.i = 0; vars.i < assets.length; vars.i++) {
+      kTokenAddresses[vars.i] = _reserves[assets[vars.i]].kTokenAddress;
+
+      premiums[vars.i] = amounts[vars.i].mul(_flashLoanPremiumTotal).div(10000);
+
+      IKToken(kTokenAddresses[vars.i]).transferUnderlyingTo(receiverAddress, amounts[vars.i]);
+    }
+
+    require(
+      vars.receiver.executeOperation(assets, amounts, premiums, msg.sender, params),
+      Errors.GetError(Errors.Error.LP_INVALID_FLASH_LOAN_EXECUTOR_RETURN)
+    );
+
+    for (vars.i = 0; vars.i < assets.length; vars.i++) {
+      vars.currentAsset = assets[vars.i];
+      vars.currentAmount = amounts[vars.i];
+      vars.currentPremium = premiums[vars.i];
+      vars.currentKTokenAddress = kTokenAddresses[vars.i];
+      vars.currentAmountPlusPremium = vars.currentAmount.add(vars.currentPremium);
+
+      {
+        _reserves[vars.currentAsset].updateState();
+        _reserves[vars.currentAsset].cumulateToLiquidityIndex(
+          IERC20(vars.currentKTokenAddress).totalSupply(),
+          vars.currentPremium
+        );
+        _reserves[vars.currentAsset].updateInterestRates(
+          vars.currentAsset,
+          vars.currentKTokenAddress,
+          vars.currentAmountPlusPremium,
+          0
+        );
+
+        IERC20(vars.currentAsset).safeTransferFrom(
+          receiverAddress,
+          vars.currentKTokenAddress,
+          vars.currentAmountPlusPremium
+        );
+      }
+      emit FlashLoan(
+        receiverAddress,
+        msg.sender,
+        vars.currentAsset,
+        vars.currentAmount,
+        vars.currentPremium,
+        referralCode
+      );
+    }
+  }
 
   /**
    * @dev Allows supplyers to enable/disable a specific supplied asset as collateral
@@ -239,7 +318,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
    * @param debtAsset The address of the underlying borrowed asset to be repaid with the liquidation
    * @param user The address of the borrower getting liquidated
    * @param debtToCover The debt amount of borrowed `asset` the liquidator wants to cover
-   * @param receiveAToken `true` if the liquidators wants to receive the collateral kTokens, `false` if he wants
+   * @param receiveKToken `true` if the liquidators wants to receive the collateral kTokens, `false` if he wants
    * to receive the underlying collateral asset directly
    **/
   function liquidationCall(
@@ -247,7 +326,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     address debtAsset,
     address user,
     uint256 debtToCover,
-    bool receiveAToken
+    bool receiveKToken
   ) external override whenNotPaused {
     (Errors.Error success, Errors.Error result) =
       LiquidationLogic.liquidationCall(
@@ -256,7 +335,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
           debtAsset: debtAsset,
           user: user,
           debtToCover: debtToCover,
-          receiveAToken: receiveAToken,
+          receiveKToken: receiveKToken,
           reservesCount: _reservesCount,
           oracleAddress: _addressesProvider.getPriceOracle()
         }),
@@ -477,7 +556,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     uint256 balanceFromBefore,
     uint256 balanceToBefore
   ) external override whenNotPaused {
-    require(msg.sender == _reserves[asset].kTokenAddress, Errors.GetError(Errors.Error.LP_CALLER_MUST_BE_AN_ATOKEN));
+    require(msg.sender == _reserves[asset].kTokenAddress, Errors.GetError(Errors.Error.LP_CALLER_MUST_BE_AN_KTOKEN));
 
     ValidationLogic.validateTransfer(
       from,

@@ -47,6 +47,9 @@ contract LendingPoolStorage {
   uint256 internal _maxNumberOfReserves;
   // whether or not the pool is allowed to open position
   bool internal _positionIsPaused;
+
+  uint256 internal _flashLoanPremiumTotal;
+
   // the liquidation threshold for positions, in ray
   uint256 internal _positionLiquidationThreshold;
   // the maximum lending leverage, in ray

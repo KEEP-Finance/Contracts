@@ -39,6 +39,11 @@ module.exports = {
     //   accounts: [`0x${PRIVATE_KEY}`]
     // },
   },
+  contractSizer: {
+    alphaSort: true,
+    runOnCompile: false,
+    disambiguatePaths: false,
+  },
   solidity: {
     compilers: [
       {
@@ -47,7 +52,6 @@ module.exports = {
           optimizer: {
             enabled: true,
             runs: 100000,
-            
           }
         }
       },

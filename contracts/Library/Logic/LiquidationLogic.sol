@@ -33,7 +33,7 @@ library LiquidationLogic {
    * @param debtAsset The address of the underlying borrowed asset to be repaid with the liquidation
    * @param user The address of the borrower getting liquidated
    * @param debtToCover The debt amount of borrowed `asset` the liquidator wants to cover
-   * @param receiveAToken `true` if the liquidators wants to receive the collateral aTokens, `false` if he wants
+   * @param receiveKToken `true` if the liquidators wants to receive the collateral kTokens, `false` if he wants
    * to receive the underlying collateral asset directly
    */
   struct LiquidationCallCallVars {
@@ -41,7 +41,7 @@ library LiquidationLogic {
     address debtAsset;
     address user;
     uint256 debtToCover;
-    bool    receiveAToken;
+    bool    receiveKToken;
     uint256 reservesCount;
     address oracleAddress;
   }
@@ -56,7 +56,7 @@ library LiquidationLogic {
     uint256 maxCollateralToLiquidate;
     uint256 debtAmountNeeded;
     uint256 healthFactor;
-    uint256 liquidatorPreviousATokenBalance;
+    uint256 liquidatorPreviousKTokenBalance;
     IKToken collateralKtoken;
     bool isCollateralEnabled;
     DataTypes.InterestRateMode borrowRateMode;
@@ -72,7 +72,7 @@ library LiquidationLogic {
     uint256 debtToCover,
     uint256 liquidatedCollateralAmount,
     address liquidator,
-    bool receiveAToken
+    bool receiveKToken
   );
   event LiquidationCallPosition(
     uint256 id,
@@ -170,7 +170,7 @@ library LiquidationLogic {
     // If the liquidator reclaims the underlying asset, we make sure there is enough available liquidity in the
     // collateral reserve
     {
-      if (!callVars.receiveAToken) {
+      if (!callVars.receiveKToken) {
         uint256 currentAvailableCollateral =
           IERC20(callVars.collateralAsset).balanceOf(address(vars.collateralKtoken));
         if (currentAvailableCollateral < vars.maxCollateralToLiquidate) {
@@ -200,11 +200,11 @@ library LiquidationLogic {
     }
 
     {
-      if (callVars.receiveAToken) {
-        vars.liquidatorPreviousATokenBalance = IERC20(vars.collateralKtoken).balanceOf(msg.sender);
+      if (callVars.receiveKToken) {
+        vars.liquidatorPreviousKTokenBalance = IERC20(vars.collateralKtoken).balanceOf(msg.sender);
         vars.collateralKtoken.transferOnLiquidation(callVars.user, msg.sender, vars.maxCollateralToLiquidate);
   
-        if (vars.liquidatorPreviousATokenBalance == 0) {
+        if (vars.liquidatorPreviousKTokenBalance == 0) {
           DataTypes.UserConfigurationMap storage liquidatorConfig = _usersConfig[msg.sender];
           liquidatorConfig.isUsingAsCollateral[collateralReserve.id] = true;
           emit ReserveUsedAsCollateralEnabled(callVars.collateralAsset, msg.sender);
@@ -218,7 +218,7 @@ library LiquidationLogic {
           vars.maxCollateralToLiquidate
         );
 
-        // Burn the equivalent amount of aToken, sending the underlying to the liquidator
+        // Burn the equivalent amount of kToken, sending the underlying to the liquidator
         vars.collateralKtoken.burn(
           callVars.user,
           msg.sender,
@@ -237,7 +237,7 @@ library LiquidationLogic {
       }
     }
 
-    // Transfers the debt asset being repaid to the aToken, where the liquidity is kept
+    // Transfers the debt asset being repaid to the kToken, where the liquidity is kept
     {
       IERC20(callVars.debtAsset).safeTransferFrom(
         msg.sender,
@@ -258,7 +258,7 @@ library LiquidationLogic {
         vars.actualDebtToLiquidate,
         vars.maxCollateralToLiquidate,
         msg.sender,
-        callVars.receiveAToken
+        callVars.receiveKToken
       );
     }
 

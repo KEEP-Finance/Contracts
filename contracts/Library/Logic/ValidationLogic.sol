@@ -249,6 +249,15 @@ library ValidationLogic {
   }
 
   /**
+   * @dev Validates a flashloan action
+   * @param assets The assets being flashborrowed
+   * @param amounts The amounts for each asset being borrowed
+   **/
+  function validateFlashloan(address[] memory assets, uint256[] memory amounts) internal pure {
+    require(assets.length == amounts.length, Errors.GetError(Errors.Error.VL_INCONSISTENT_FLASHLOAN_PARAMS));
+  }
+
+  /**
    * @dev Validates the action of setting an asset as collateral
    * @param reserve The state of the reserve that the user is enabling or disabling as collateral
    * @param reserveAddress The address of the reserve
