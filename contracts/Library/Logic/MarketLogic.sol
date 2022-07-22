@@ -9,6 +9,7 @@ import {IDToken} from '../../Interface/IDToken.sol';
 import {IKToken} from '../../Interface/IKToken.sol';
 import {ILendingPool} from '../../Interface/ILendingPool.sol';
 import {IPriceOracleGetter} from '../../Interface/IPriceOracleGetter.sol';
+import {IFlashLoanReceiver} from '../../Interface/IFlashLoanReceiver.sol';
 import {Errors} from '../Helper/Errors.sol';
 import {IERC20} from '../../Dependency/openzeppelin/IERC20.sol';
 import {Address} from '../../Dependency/openzeppelin/Address.sol';
@@ -292,5 +293,87 @@ library MarketLogic {
     emit Repay(asset, onBehalfOf, msg.sender, paybackAmount);
 
     return paybackAmount;
+  }
+
+  struct FlashLoanCallVars {
+    address receiverAddress;
+    address[] assets;
+    uint256[] amounts;
+    bytes params;
+    uint16 referralCode;
+    uint256 flashLoanPremiumTotal;
+  }
+
+  struct FlashLoanLocalVars {
+    IFlashLoanReceiver receiver;
+    uint256 i;
+    address currentAsset;
+    address currentKTokenAddress;
+    uint256 currentAmount;
+    uint256 currentPremium;
+    uint256 currentAmountPlusPremium;
+  }
+
+  function flashLoan(
+    FlashLoanCallVars memory callVars,
+    mapping(address => DataTypes.ReserveData) storage _reserves
+  ) external {
+    FlashLoanLocalVars memory vars;
+
+    ValidationLogic.validateFlashloan(callVars.assets, callVars.amounts);
+
+    address[] memory kTokenAddresses = new address[](callVars.assets.length);
+    uint256[] memory premiums = new uint256[](callVars.assets.length);
+
+    vars.receiver = IFlashLoanReceiver(callVars.receiverAddress);
+
+    for (vars.i = 0; vars.i < callVars.assets.length; vars.i++) {
+      kTokenAddresses[vars.i] = _reserves[callVars.assets[vars.i]].kTokenAddress;
+
+      premiums[vars.i] = callVars.amounts[vars.i].percentMul(callVars.flashLoanPremiumTotal);
+
+      IKToken(kTokenAddresses[vars.i]).transferUnderlyingTo(callVars.receiverAddress, callVars.amounts[vars.i]);
+    }
+
+    require(
+      vars.receiver.executeOperation(callVars.assets, callVars.amounts, premiums, msg.sender, callVars.params),
+      Errors.GetError(Errors.Error.LP_INVALID_FLASH_LOAN_EXECUTOR_RETURN)
+    );
+
+    for (vars.i = 0; vars.i < callVars.assets.length; vars.i++) {
+      vars.currentAsset = callVars.assets[vars.i];
+      vars.currentAmount = callVars.amounts[vars.i];
+      vars.currentPremium = premiums[vars.i];
+      vars.currentKTokenAddress = kTokenAddresses[vars.i];
+      vars.currentAmountPlusPremium = vars.currentAmount.add(vars.currentPremium);
+
+      {
+        _reserves[vars.currentAsset].updateState();
+        _reserves[vars.currentAsset].cumulateToLiquidityIndex(
+          IERC20(vars.currentKTokenAddress).totalSupply(),
+          vars.currentPremium
+        );
+        _reserves[vars.currentAsset].updateInterestRates(
+          vars.currentAsset,
+          vars.currentKTokenAddress,
+          vars.currentAmountPlusPremium,
+          0
+        );
+
+        IERC20(vars.currentAsset).safeTransferFrom(
+          callVars.receiverAddress,
+          vars.currentKTokenAddress,
+          vars.currentAmountPlusPremium
+        );
+      }
+      emit FlashLoan(
+        callVars.receiverAddress,
+        msg.sender,
+        vars.currentAsset,
+        vars.currentAmount,
+        vars.currentPremium,
+        callVars.referralCode
+      );
+    }
   }
 }

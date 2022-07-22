@@ -73,6 +73,7 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     _maximumLeverage = 20 * (10**27); // 20 ray
     _positionLiquidationThreshold = 2 * (10**25); // 0.02 ray
     _name = poolName;
+    _flashLoanPremiumTotal = 5; // 0.05% premium for each flashLoan call
   }
 
   /**
@@ -199,83 +200,26 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
       );
     return paybackAmount;
   }
-  
-  struct FlashLoanLocalVars {
-    IFlashLoanReceiver receiver;
-    uint256 i;
-    address currentAsset;
-    address currentKTokenAddress;
-    uint256 currentAmount;
-    uint256 currentPremium;
-    uint256 currentAmountPlusPremium;
-  }
 
   /// @inheritdoc ILendingPool
   function flashLoan(
     address receiverAddress,
     address[] calldata assets,
     uint256[] calldata amounts,
-    address onBehalfOf,
     bytes calldata params,
     uint16 referralCode
   ) external override whenNotPaused {
-    FlashLoanLocalVars memory vars;
-
-    ValidationLogic.validateFlashloan(assets, amounts);
-
-    address[] memory kTokenAddresses = new address[](assets.length);
-    uint256[] memory premiums = new uint256[](assets.length);
-
-    vars.receiver = IFlashLoanReceiver(receiverAddress);
-
-    for (vars.i = 0; vars.i < assets.length; vars.i++) {
-      kTokenAddresses[vars.i] = _reserves[assets[vars.i]].kTokenAddress;
-
-      premiums[vars.i] = amounts[vars.i].mul(_flashLoanPremiumTotal).div(10000);
-
-      IKToken(kTokenAddresses[vars.i]).transferUnderlyingTo(receiverAddress, amounts[vars.i]);
-    }
-
-    require(
-      vars.receiver.executeOperation(assets, amounts, premiums, msg.sender, params),
-      Errors.GetError(Errors.Error.LP_INVALID_FLASH_LOAN_EXECUTOR_RETURN)
+    MarketLogic.flashLoan(
+      MarketLogic.FlashLoanCallVars({
+        receiverAddress: receiverAddress,
+        assets: assets,
+        amounts: amounts,
+        params: params,
+        referralCode: referralCode,
+        flashLoanPremiumTotal: _flashLoanPremiumTotal
+      }),
+      _reserves
     );
-
-    for (vars.i = 0; vars.i < assets.length; vars.i++) {
-      vars.currentAsset = assets[vars.i];
-      vars.currentAmount = amounts[vars.i];
-      vars.currentPremium = premiums[vars.i];
-      vars.currentKTokenAddress = kTokenAddresses[vars.i];
-      vars.currentAmountPlusPremium = vars.currentAmount.add(vars.currentPremium);
-
-      {
-        _reserves[vars.currentAsset].updateState();
-        _reserves[vars.currentAsset].cumulateToLiquidityIndex(
-          IERC20(vars.currentKTokenAddress).totalSupply(),
-          vars.currentPremium
-        );
-        _reserves[vars.currentAsset].updateInterestRates(
-          vars.currentAsset,
-          vars.currentKTokenAddress,
-          vars.currentAmountPlusPremium,
-          0
-        );
-
-        IERC20(vars.currentAsset).safeTransferFrom(
-          receiverAddress,
-          vars.currentKTokenAddress,
-          vars.currentAmountPlusPremium
-        );
-      }
-      emit FlashLoan(
-        receiverAddress,
-        msg.sender,
-        vars.currentAsset,
-        vars.currentAmount,
-        vars.currentPremium,
-        referralCode
-      );
-    }
   }
 
   /**
@@ -536,6 +480,13 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
    */
   function MAX_LEVERAGE() external view returns (uint256) {
     return _maximumLeverage;
+  }
+
+  /**
+   * @dev Returns the fee on flash loans 
+   */
+  function FLASHLOAN_PREMIUM_TOTAL() public view returns (uint256) {
+    return _flashLoanPremiumTotal;
   }
 
   /**

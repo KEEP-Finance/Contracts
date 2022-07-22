@@ -138,7 +138,7 @@ async function main() {
   console.log("Main pool configurator address: ", main_pool_configurator.address);
   console.log("ETH-USDC pool configurator address: ", eth_usdc_pool_configurator.address);
 
-  // 9. add 2 pools to address provider
+  // 8. add 2 pools to address provider
   await address_provider.addPool(
     main_pool.address,
     main_pool_configurator.address
@@ -148,6 +148,13 @@ async function main() {
     eth_usdc_pool_configurator.address
   );
   console.log("Pools registered");
+
+  // 9. deploy flashLoanMock
+  const FlashLoanReceiverExample = await hre.ethers.getContractFactory("FlashLoanReceiverExample");
+  let main_pool_id = await address_provider.getLendingPoolID(main_pool.address);
+  let flash_loan_receiver_example = await FlashLoanReceiverExample.deploy(address_provider.address, main_pool_id)
+  await flash_loan_receiver_example.deployed()
+  console.log("Flash Loan Receiver: ", flash_loan_receiver_example.address)
 
   // 10. init ETH, USDC, MATIC on main pool
   let eth_init_reserve_input = [

@@ -265,7 +265,6 @@ interface ILendingPool {
    * @param receiverAddress The address of the contract receiving the funds, implementing the IFlashLoanReceiver interface
    * @param assets The addresses of the assets being flash-borrowed
    * @param amounts The amounts amounts being flash-borrowed
-   * @param onBehalfOf The address  that will receive the debt in the case of using on `modes` 1 or 2
    * @param params Variadic packed params to pass to the receiver as extra information
    * @param referralCode Code used to register the integrator originating the operation, for potential rewards.
    *   0 if the action is executed directly by the user, without any middle-man
@@ -274,7 +273,6 @@ interface ILendingPool {
     address receiverAddress,
     address[] calldata assets,
     uint256[] calldata amounts,
-    address onBehalfOf,
     bytes calldata params,
     uint16 referralCode
   ) external;
