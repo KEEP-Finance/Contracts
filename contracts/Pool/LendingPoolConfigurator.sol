@@ -145,9 +145,9 @@ contract LendingPoolConfigurator is ILendingPoolConfigurator {
   ) external onlyMainAdmin {
     DataTypes.ReserveConfiguration memory currentConfig = pool.getConfiguration(asset);
 
-    //validation of the parameters: the LTV can
-    //only be lower or equal than the liquidation threshold
-    //(otherwise a loan against the asset would cause instantaneous liquidation)
+    // validation of the parameters: the LTV can
+    // only be lower or equal than the liquidation threshold
+    // (otherwise a loan against the asset would cause instantaneous liquidation)
     require(ltv <= liquidationThreshold, Errors.GetError(Errors.Error.LPC_INVALID_CONFIGURATION));
 
     if (liquidationThreshold != 0) {
