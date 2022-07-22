@@ -21,6 +21,7 @@ contract MockSwap is IKSwapRouter {
     address tokenIn,
     address tokenOut,
     uint256 amountOut,
+    uint256 amountInMax,
     address recipient
   ) external override returns (uint256 _amountIn, uint256 _amountOut) {
     IMockERC20(tokenOut).faucet(address(this), amountOut);
@@ -35,6 +36,7 @@ contract MockSwap is IKSwapRouter {
     address tokenIn,
     address tokenOut,
     uint256 amountIn,
+    uint256 amountOutMin,
     address recipient
   ) external override returns (uint256 _amountIn, uint256 _amountOut) {
     

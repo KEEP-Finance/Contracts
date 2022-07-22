@@ -8,8 +8,8 @@ interface ILendingPoolAddressesProvider {
   event PriceOracleUpdated(address indexed newAddress);
   event LendingRateOracleUpdated(address indexed newAddress);
   event AddressSet(bytes32 id, address indexed newAddress);
-  event PoolAdded(address pool_address, address configuratorAddress, address lending_pool_cm_address);
-  event LendingPoolUpdated(uint id, address pool, address lending_pool_configurator_address, address lending_pool_cm_address);
+  event PoolAdded(address pool_address, address configuratorAddress);
+  event LendingPoolUpdated(uint id, address pool, address lending_pool_configurator_address);
   event PoolRemoved(address pool_address);
   event SwapRouterUpdated(address dex);
 
@@ -21,11 +21,9 @@ interface ILendingPoolAddressesProvider {
 
   function getLendingPoolConfigurator(address pool) external view returns (address);
 
-  function getLendingPoolCollateralManager(address pool) external view returns (address);
+  function setLendingPool(uint id, address pool, address lending_pool_configurator_address) external;
 
-  function setLendingPool(uint id, address pool, address lending_pool_configurator_address, address lending_pool_cm_address) external;
-
-  function addPool(address pool_address, address configurator_address, address cm_address) external;
+  function addPool(address pool_address, address configurator_address) external;
 
   function removePool(address pool_address) external;
 

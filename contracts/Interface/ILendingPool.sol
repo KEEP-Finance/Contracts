@@ -7,13 +7,13 @@ import {IAggregationRouterV4} from './1inch/IAggregationRouterV4.sol';
 
 interface ILendingPool {
   /**
-   * @dev Emitted on deposit()
+   * @dev Emitted on supply()
    * @param reserve The address of the underlying asset of the reserve
-   * @param user The address initiating the deposit
-   * @param onBehalfOf The beneficiary of the deposit, receiving the aTokens
-   * @param amount The amount deposited
+   * @param user The address initiating the supply
+   * @param onBehalfOf The beneficiary of the supply, receiving the aTokens
+   * @param amount The amount supplied
    **/
-  event Deposit(
+  event Supply(
     address indexed reserve,
     address user,
     address indexed onBehalfOf,
@@ -169,15 +169,15 @@ interface ILendingPool {
   ) external;
 
     /**
-   * @dev Deposits an `amount` of underlying asset into the reserve, receiving in return overlying aTokens.
-   * - E.g. User deposits 100 USDC and gets in return 100 aUSDC
-   * @param asset The address of the underlying asset to deposit
-   * @param amount The amount to be deposited
+   * @dev Supply an `amount` of underlying asset into the reserve, receiving in return overlying aTokens.
+   * - E.g. User supplies 100 USDC and gets in return 100 aUSDC
+   * @param asset The address of the underlying asset to supply
+   * @param amount The amount to be supplied
    * @param onBehalfOf The address that will receive the aTokens, same as msg.sender if the user
    *   wants to receive them on his own wallet, or a different address if the beneficiary of aTokens
    *   is a different wallet
    **/
-  function deposit(
+  function supply(
     address asset,
     uint256 amount,
     address onBehalfOf
@@ -202,7 +202,7 @@ interface ILendingPool {
 
   /**
    * @dev Allows users to borrow a specific `amount` of the reserve underlying asset, provided that the borrower
-   * already deposited enough collateral, or he was given enough allowance by a credit delegator on the
+   * already supplied enough collateral, or he was given enough allowance by a credit delegator on the
    * corresponding debt token (StableDebtToken or VariableDebtToken)
    * - E.g. User borrows 100 USDC passing as `onBehalfOf` his own address, receiving the 100 USDC in his wallet
    *   and 100 stable/variable debt tokens, depending on the `interestRateMode`
@@ -240,9 +240,9 @@ interface ILendingPool {
   ) external returns (uint256);
 
   /**
-   * @dev Allows depositors to enable/disable a specific deposited asset as collateral
-   * @param asset The address of the underlying asset deposited
-   * @param useAsCollateral `true` if the user wants to use the deposit as collateral, `false` otherwise
+   * @dev Allows suppliers to enable/disable a specific supplied asset as collateral
+   * @param asset The address of the underlying asset supplied
+   * @param useAsCollateral `true` if the user wants to use the supply as collateral, `false` otherwise
    **/
   function setUserUseReserveAsCollateral(address asset, bool useAsCollateral) external;
 
@@ -266,13 +266,40 @@ interface ILendingPool {
   ) external;
 
   /**
+   * @dev Open a position, supply margin and borrow from pool. Traders should 
+   * approve pools at first for the transfer of their assets
+   * @param collateralAsset The address of asset the trader supply as margin
+   * @param shortAsset The address of asset the trader would like to borrow at a leverage
+   * @param longAsset The address of asset the pool will hold after swap
+   * @param collateralAmount The amount of margin the trader transfers in margin decimals
+   * @param leverage The leverage specified by user in ray
+   **/
+  function openPosition(
+    address collateralAsset,
+    address shortAsset,
+    address longAsset,
+    uint256 collateralAmount,
+    uint256 leverage,
+    uint256 minLongAmountOut,
+    address onBehalfOf
+  )
+    external
+    returns (
+      DataTypes.TraderPosition memory position
+    );
+
+  /**
    * @dev Close a position, swap all margin / pnl into paymentAsset
-   * @param id The id of position
+   * @param positionId The id of position
    * @return paymentAmount The amount of asset to payback user 
    * @return pnl The pnl in ETH (wad)
    **/
   function closePosition(
-    uint256 id
+    uint256 positionId,
+    address to,
+    uint256 minLongToShortAmountOut,
+    uint256 minShortToCollateralAmountOut,
+    uint256 minCollateralToShortAmountOut
   )
     external
     returns (

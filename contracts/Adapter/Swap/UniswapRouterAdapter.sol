@@ -21,6 +21,7 @@ contract UniswapRouterAdapter is IKSwapRouter, Ownable {
     address tokenIn,
     address tokenOut,
     uint256 amountOut,
+    uint256 amountInMax,
     address recipient
   ) external override returns (uint256 _amountIn, uint256 _amountOut) {
     // approve
@@ -39,7 +40,7 @@ contract UniswapRouterAdapter is IKSwapRouter, Ownable {
     recipient, // address recipient;
     type(uint256).max, // uint256 deadline;
     amountOut, // uint256 amountOut;
-    type(uint256).max, // uint256 amountInMaximum;
+    amountInMax, // uint256 amountInMaximum;
     0 // uint160 sqrtPriceLimitX96;
     );
     _amountIn = uniswapSwapRouter.exactOutputSingle(params);
@@ -50,6 +51,7 @@ contract UniswapRouterAdapter is IKSwapRouter, Ownable {
     address tokenIn,
     address tokenOut,
     uint256 amountIn,
+    uint256 amountOutMin,
     address recipient
   ) external override returns (uint256 _amountIn, uint256 _amountOut) {
     // approve
@@ -68,7 +70,7 @@ contract UniswapRouterAdapter is IKSwapRouter, Ownable {
       recipient, // address recipient;
       type(uint256).max, // uint256 deadline;
       amountIn, // uint256 amountIn;
-      0, // uint256 amountOutMinimum;
+      amountOutMin, // uint256 amountOutMinimum;
       0 // uint160 sqrtPriceLimitX96;
     );
     _amountIn = amountIn;

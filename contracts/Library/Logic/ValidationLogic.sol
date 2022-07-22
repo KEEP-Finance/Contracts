@@ -73,11 +73,11 @@ library ValidationLogic {
   }
 
   /**
-   * @dev Validates a deposit action
-   * @param reserve The reserve object on which the user is depositing
-   * @param amount The amount to be deposited
+   * @dev Validates a supply action
+   * @param reserve The reserve object on which the user is supplying
+   * @param amount The amount to be supplied
    */
-  function validateDeposit(DataTypes.ReserveData storage reserve, uint256 amount) external view {
+  function validateSupply(DataTypes.ReserveData storage reserve, uint256 amount) external view {
     bool isActive = reserve.configuration.active;
     bool isFrozen = reserve.configuration.frozen;
 
@@ -128,6 +128,16 @@ library ValidationLogic {
     );
   }
 
+  struct ValidateBorrowCallVars {
+    address asset;
+    address userAddress;
+    uint256 amount;
+    uint256 amountInETH;
+    uint256 interestRateMode;
+    uint256 reservesCount;
+    address oracleAddress;
+  }
+
   struct ValidateBorrowLocalVars {
     uint256 currentLtv;
     uint256 currentLiquidationThreshold;
@@ -143,30 +153,18 @@ library ValidationLogic {
 
   /**
    * @dev Validates a borrow action
-   * @param asset The address of the asset to borrow
    * @param reserve The reserve state from which the user is borrowing
-   * @param userAddress The address of the user
-   * @param amount The amount to be borrowed
-   * @param amountInETH The amount to be borrowed, in ETH
-   * @param interestRateMode The interest rate mode at which the user is borrowing
    * @param reservesData The state of all the reserves
    * @param userConfig The state of the user for the specific reserve
    * @param reserves The addresses of all the active reserves
-   * @param oracle The price oracle
    */
 
   function validateBorrow(
-    address asset,
+    ValidateBorrowCallVars memory callVars,
     DataTypes.ReserveData storage reserve,
-    address userAddress,
-    uint256 amount,
-    uint256 amountInETH,
-    uint256 interestRateMode,
     mapping(address => DataTypes.ReserveData) storage reservesData,
     DataTypes.UserConfigurationMap storage userConfig,
-    mapping(uint256 => address) storage reserves,
-    uint256 reservesCount,
-    address oracle
+    mapping(uint256 => address) storage reserves
   ) external view {
     ValidateBorrowLocalVars memory vars;
 
@@ -176,13 +174,13 @@ library ValidationLogic {
 
     require(vars.isActive, Errors.GetError(Errors.Error.VL_NO_ACTIVE_RESERVE));
     require(!vars.isFrozen, Errors.GetError(Errors.Error.VL_RESERVE_FROZEN));
-    require(amount != 0, Errors.GetError(Errors.Error.VL_INVALID_AMOUNT));
+    require(callVars.amount != 0, Errors.GetError(Errors.Error.VL_INVALID_AMOUNT));
 
     require(vars.borrowingEnabled, Errors.GetError(Errors.Error.VL_BORROWING_NOT_ENABLED));
 
     //validate interest rate mode
     require(
-      uint256(DataTypes.InterestRateMode.VARIABLE) == interestRateMode,
+      uint256(DataTypes.InterestRateMode.VARIABLE) == callVars.interestRateMode,
       Errors.GetError(Errors.Error.VL_INVALID_INTEREST_RATE_MODE_SELECTED)
     );
 
@@ -193,12 +191,12 @@ library ValidationLogic {
       vars.currentLiquidationThreshold,
       vars.healthFactor
     ) = GenericLogic.calculateUserAccountData(
-      userAddress,
+      callVars.userAddress,
       reservesData,
       userConfig,
       reserves,
-      reservesCount,
-      oracle
+      callVars.reservesCount,
+      callVars.oracleAddress
     );
 
     require(vars.userCollateralBalanceETH > 0, Errors.GetError(Errors.Error.VL_COLLATERAL_BALANCE_IS_0));
@@ -209,7 +207,7 @@ library ValidationLogic {
     );
 
     // add the current already borrowed amount to the amount requested to calculate the total collateral needed.
-    vars.amountOfCollateralNeededETH = vars.userBorrowBalanceETH.add(amountInETH).percentDiv(
+    vars.amountOfCollateralNeededETH = vars.userBorrowBalanceETH.add(callVars.amountInETH).percentDiv(
       vars.currentLtv
     ); // LTV is calculated in percentage
 
@@ -285,7 +283,7 @@ library ValidationLogic {
           reservesCount,
           oracle
         ),
-      Errors.GetError(Errors.Error.VL_DEPOSIT_ALREADY_IN_USE)
+      Errors.GetError(Errors.Error.VL_SUPPLY_ALREADY_IN_USE)
     );
   }
 
@@ -303,20 +301,20 @@ library ValidationLogic {
     DataTypes.UserConfigurationMap storage userConfig,
     uint256 userHealthFactor,
     uint256 userVariableDebt
-  ) internal view returns (uint256, string memory) {
+  ) internal view returns (Errors.Error, Errors.Error) {
     if (
       !collateralReserve.configuration.active || !principalReserve.configuration.active
     ) {
       return (
-        uint256(Errors.Error.CM_NO_ACTIVE_RESERVE),
-        Errors.GetError(Errors.Error.VL_NO_ACTIVE_RESERVE)
+        Errors.Error.CM_NO_ACTIVE_RESERVE,
+        Errors.Error.VL_NO_ACTIVE_RESERVE
       );
     }
 
     if (userHealthFactor >= GenericLogic.HEALTH_FACTOR_LIQUIDATION_THRESHOLD) {
       return (
-        uint256(Errors.Error.CM_HEALTH_FACTOR_ABOVE_THRESHOLD),
-        Errors.GetError(Errors.Error.LPCM_HEALTH_FACTOR_NOT_BELOW_THRESHOLD)
+        Errors.Error.CM_HEALTH_FACTOR_ABOVE_THRESHOLD,
+        Errors.Error.LL_HEALTH_FACTOR_NOT_BELOW_THRESHOLD
       );
     }
 
@@ -327,19 +325,19 @@ library ValidationLogic {
     //if collateral isn't enabled as collateral by user, it cannot be liquidated
     if (!isCollateralEnabled) {
       return (
-        uint256(Errors.Error.CM_COLLATERAL_CANNOT_BE_LIQUIDATED),
-        Errors.GetError(Errors.Error.LPCM_COLLATERAL_CANNOT_BE_LIQUIDATED)
+        Errors.Error.CM_COLLATERAL_CANNOT_BE_LIQUIDATED,
+        Errors.Error.LL_COLLATERAL_CANNOT_BE_LIQUIDATED
       );
     }
 
     if (userVariableDebt == 0) {
       return (
-        uint256(Errors.Error.CM_CURRRENCY_NOT_BORROWED),
-        Errors.GetError(Errors.Error.LPCM_SPECIFIED_CURRENCY_NOT_BORROWED_BY_USER)
+        Errors.Error.CM_CURRRENCY_NOT_BORROWED,
+        Errors.Error.LL_SPECIFIED_CURRENCY_NOT_BORROWED_BY_USER
       );
     }
 
-    return (uint256(Errors.Error.CM_NO_ERROR), Errors.GetError(Errors.Error.LPCM_NO_ERRORS));
+    return (Errors.Error.CM_NO_ERROR, Errors.Error.LL_NO_ERRORS);
   }
 
   /**

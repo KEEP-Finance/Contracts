@@ -9,6 +9,7 @@ import {IDToken} from '../Interface/IDToken.sol';
 import {IKToken} from '../Interface/IKToken.sol';
 import {ILendingPool} from '../Interface/ILendingPool.sol';
 import {IPriceOracleGetter} from '../Interface/IPriceOracleGetter.sol';
+import {IKSwapRouter} from '../Interface/IKSwapRouter.sol';
 import {Errors} from '../Library/Helper/Errors.sol';
 import {IERC20} from '../Dependency/openzeppelin/IERC20.sol';
 import {Address} from '../Dependency/openzeppelin/Address.sol';
@@ -18,9 +19,12 @@ import {LendingPoolStorage} from './LendingPoolStorage.sol';
 import {ILendingPoolAddressesProvider} from '../Interface/ILendingPoolAddressesProvider.sol';
 import {DataTypes} from '../Library/Type/DataTypes.sol';
 import {GenericLogic} from '../Library/Logic/GenericLogic.sol';
+import {LiquidationLogic} from '../Library/Logic/LiquidationLogic.sol';
+import {MarginLogic} from '../Library/Logic/MarginLogic.sol';
+import {MarketLogic} from '../Library/Logic/MarketLogic.sol';
 import {ValidationLogic} from '../Library/Logic/ValidationLogic.sol';
 import {ReserveLogic} from '../Library/Logic/ReserveLogic.sol';
-import {IKSwapRouter} from '../Interface/IKSwapRouter.sol';
+
 
 contract LendingPool is ILendingPool, LendingPoolStorage {
   using WadRayMath for uint256;
@@ -71,42 +75,29 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
   }
 
   /**
-   * @dev Deposits an `amount` of underlying asset into the reserve, receiving in return overlying kTokens.
-   * - E.g. User deposits 100 USDC and gets in return 100 aUSDC
-   * @param asset The address of the underlying asset to deposit
-   * @param amount The amount to be deposited
+   * @dev Supply an `amount` of underlying asset into the reserve, receiving in return overlying kTokens.
+   * - E.g. User supplies 100 USDC and gets in return 100 aUSDC
+   * @param asset The address of the underlying asset to supply
+   * @param amount The amount to be supplied
    * @param onBehalfOf The address that will receive the kTokens, same as msg.sender if the user
    *   wants to receive them on his own wallet, or a different address if the beneficiary of kTokens
    *   is a different wallet
    **/
-  function deposit(
+  function supply(
     address asset,
     uint256 amount,
     address onBehalfOf
   ) external override whenNotPaused {
-    DataTypes.ReserveData storage reserve = _reserves[asset];
-
-    ValidationLogic.validateDeposit(reserve, amount);
-
-    address kToken = reserve.kTokenAddress;
-
-    reserve.updateState();
-    reserve.updateInterestRates(asset, kToken, amount, 0);
-
-    // NOTE: reduce complexity for frontend, as they need only approve once
-    IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-    IERC20(asset).safeTransfer(kToken, amount);
-
-    bool isFirstDeposit = IKToken(kToken).mint(onBehalfOf, amount, reserve.liquidityIndex);
-
-    if (isFirstDeposit) {
-      _usersConfig[onBehalfOf].isUsingAsCollateral[reserve.id] = true;
-      emit ReserveUsedAsCollateralEnabled(asset, onBehalfOf);
-    }
-
+    MarketLogic.supply(
+      MarketLogic.SupplyCallVars({
+        asset: asset,
+        amount: amount,
+        onBehalfOf: onBehalfOf
+      }),
+      _reserves, 
+      _usersConfig
+    );
     _addUserToList(onBehalfOf);
-
-    emit Deposit(asset, msg.sender, onBehalfOf, amount);
   }
 
   /**
@@ -125,49 +116,26 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     uint256 amount,
     address to
   ) external override whenNotPaused returns (uint256) {
-    DataTypes.ReserveData storage reserve = _reserves[asset];
-
-    address kToken = reserve.kTokenAddress;
-
-    uint256 userBalance = IKToken(kToken).balanceOf(msg.sender);
-
-    uint256 amountToWithdraw = amount;
-
-    if (amount == type(uint256).max) {
-      amountToWithdraw = userBalance;
-    }
-
-    ValidationLogic.validateWithdraw(
-      asset,
-      amountToWithdraw,
-      userBalance,
-      _reserves,
-      _usersConfig[msg.sender],
-      _reservesList,
-      _reservesCount,
-      _addressesProvider.getPriceOracle()
-    );
-
-    reserve.updateState();
-
-    reserve.updateInterestRates(asset, kToken, 0, amountToWithdraw);
-
-    if (amountToWithdraw == userBalance) {
-      _usersConfig[msg.sender].isUsingAsCollateral[reserve.id] = false;
-      emit ReserveUsedAsCollateralDisabled(asset, msg.sender);
-    }
-
-    // transfer asset operation is in this burn function
-    IKToken(kToken).burn(msg.sender, to, amountToWithdraw, reserve.liquidityIndex);
-
-    emit Withdraw(asset, msg.sender, to, amountToWithdraw);
+    uint256 amountToWithdraw =
+      MarketLogic.withdraw(
+        MarketLogic.WithdrawCallVars({
+          asset: asset,
+          amount: amount,
+          to: to,
+          reservesCount: _reservesCount,
+          oracleAddress: _addressesProvider.getPriceOracle()
+        }),
+        _reserves,
+        _usersConfig,
+        _reservesList
+      );
 
     return amountToWithdraw;
   }
 
   /**
    * @dev Allows users to borrow a specific `amount` of the reserve underlying asset, provided that the borrower
-   * already deposited enough collateral, or he was given enough allowance by a credit delegator on the
+   * already supplied enough collateral, or he was given enough allowance by a credit delegator on the
    * corresponding debt token (dToken)
    * - E.g. User borrows 100 USDC passing as `onBehalfOf` his own address, receiving the 100 USDC in his wallet
    *   and 100 dTokens, depending on the `interestRateMode`
@@ -184,26 +152,20 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     uint256 interestRateMode,
     address onBehalfOf
   ) external override whenNotPaused {
-    DataTypes.ReserveData storage reserve = _reserves[asset];
-
-    _executeBorrow(
-      ExecuteBorrowParams(
-        asset,
-        msg.sender,
-        onBehalfOf,
-        amount,
-        interestRateMode,
-        true
-      )
-    );
-
-    emit Borrow(
-      asset,
-      msg.sender,
-      onBehalfOf,
-      amount,
-      interestRateMode,
-      reserve.currentBorrowRate
+    MarketLogic.borrow(
+      MarketLogic.BorrowCallVars({
+        asset: asset,
+        user: msg.sender,
+        onBehalfOf: onBehalfOf,
+        amount: amount,
+        interestRateMode: interestRateMode,
+        releaseUnderlying: true,
+        oracleAddress: _addressesProvider.getPriceOracle(),
+        reservesCount: _reservesCount
+      }),
+      _reserves,
+      _usersConfig,
+      _reservesList
     );
   }
 
@@ -225,57 +187,22 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     uint256 rateMode,
     address onBehalfOf
   ) external override whenNotPaused returns (uint256) {
-    DataTypes.ReserveData storage reserve = _reserves[asset];
-
-    uint256 variableDebt = IERC20(reserve.dTokenAddress).balanceOf(onBehalfOf);
-
-    DataTypes.InterestRateMode interestRateMode = DataTypes.InterestRateMode(rateMode);
-
-    ValidationLogic.validateRepay(
-      reserve,
-      amount,
-      interestRateMode,
-      onBehalfOf,
-      variableDebt
-    );
-
-    uint256 paybackAmount = variableDebt;
-
-    if (amount < paybackAmount) {
-      paybackAmount = amount;
-    }
-
-    reserve.updateState();
-
-    {
-      IDToken(reserve.dTokenAddress).burn(
+    uint256 paybackAmount =
+      MarketLogic.repay(
+        asset,
+        amount,
+        rateMode,
         onBehalfOf,
-        paybackAmount,
-        reserve.borrowIndex
+        _reserves,
+        _usersConfig
       );
-    }
-
-    address kToken = reserve.kTokenAddress;
-    reserve.updateInterestRates(asset, kToken, paybackAmount, 0);
-
-    if (variableDebt.sub(paybackAmount) == 0) {
-      _usersConfig[onBehalfOf].isBorrowing[reserve.id] = false;
-    }
-
-    IERC20(asset).safeTransferFrom(msg.sender, address(this), paybackAmount);
-    IERC20(asset).safeTransfer(kToken, paybackAmount);
-
-    IKToken(kToken).handleRepayment(msg.sender, paybackAmount);
-
-    emit Repay(asset, onBehalfOf, msg.sender, paybackAmount);
-
     return paybackAmount;
   }
 
   /**
-   * @dev Allows depositors to enable/disable a specific deposited asset as collateral
-   * @param asset The address of the underlying asset deposited
-   * @param useAsCollateral `true` if the user wants to use the deposit as collateral, `false` otherwise
+   * @dev Allows supplyers to enable/disable a specific supplied asset as collateral
+   * @param asset The address of the underlying asset supplied
+   * @param useAsCollateral `true` if the user wants to use the supply as collateral, `false` otherwise
    **/
   function setUserUseReserveAsCollateral(address asset, bool useAsCollateral)
     external
@@ -322,27 +249,24 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     uint256 debtToCover,
     bool receiveAToken
   ) external override whenNotPaused {
-    require(user != address(this), Errors.GetError(Errors.Error.LP_LIQUIDATE_LP));
-    address collateralManager = _addressesProvider.getLendingPoolCollateralManager(address(this));
-
-    //solium-disable-next-line
-    (bool success, bytes memory result) =
-      collateralManager.delegatecall(
-        abi.encodeWithSignature(
-          'liquidationCall(address,address,address,uint256,bool)',
-          collateralAsset,
-          debtAsset,
-          user,
-          debtToCover,
-          receiveAToken
-        )
+    (Errors.Error success, Errors.Error result) =
+      LiquidationLogic.liquidationCall(
+        LiquidationLogic.LiquidationCallCallVars({
+          collateralAsset: collateralAsset,
+          debtAsset: debtAsset,
+          user: user,
+          debtToCover: debtToCover,
+          receiveAToken: receiveAToken,
+          reservesCount: _reservesCount,
+          oracleAddress: _addressesProvider.getPriceOracle()
+        }),
+        _reserves,
+        _usersConfig,
+        _reservesList
       );
 
-    require(success, Errors.GetError(Errors.Error.LP_LIQUIDATION_CALL_FAILED));
-
-    (uint256 returnCode, string memory returnMessage) = abi.decode(result, (uint256, string));
-
-    require(returnCode == 0, string(abi.encodePacked(returnMessage)));
+    require(success == Errors.Error.CM_NO_ERROR, Errors.GetError(Errors.Error.LP_LIQUIDATION_CALL_FAILED));
+    require(result == Errors.Error.LL_NO_ERRORS, Errors.GetError(result));
   }
 
   /**
@@ -658,70 +582,6 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     }
   }
 
-  struct ExecuteBorrowParams {
-    address asset;
-    address user;
-    address onBehalfOf;
-    uint256 amount;
-    uint256 interestRateMode;
-    bool releaseUnderlying;
-  }
-
-  function _executeBorrow(ExecuteBorrowParams memory vars) internal {
-    DataTypes.ReserveData storage reserve = _reserves[vars.asset];
-    DataTypes.UserConfigurationMap storage userConfig = _usersConfig[vars.onBehalfOf];
-
-    address oracle = _addressesProvider.getPriceOracle();
-
-    uint256 amountInETH =
-      IPriceOracleGetter(oracle).getAssetPrice(vars.asset).mul(vars.amount).div(
-        10**reserve.configuration.decimals
-      );
-
-    ValidationLogic.validateBorrow(
-      vars.asset,
-      reserve,
-      vars.onBehalfOf,
-      vars.amount,
-      amountInETH,
-      vars.interestRateMode,
-      _reserves,
-      userConfig,
-      _reservesList,
-      _reservesCount,
-      oracle
-    );
-
-    reserve.updateState();
-
-    bool isFirstBorrowing = false;
-    {
-      isFirstBorrowing = IDToken(reserve.dTokenAddress).mint(
-        vars.user,
-        vars.onBehalfOf,
-        vars.amount,
-        reserve.borrowIndex
-      );
-    }
-
-    if (isFirstBorrowing) {
-      userConfig.isBorrowing[reserve.id] = true;
-    }
-
-    address kToken = reserve.kTokenAddress;
-
-    reserve.updateInterestRates(
-      vars.asset,
-      kToken,
-      0,
-      vars.releaseUnderlying ? vars.amount : 0
-    );
-
-    if (vars.releaseUnderlying) {
-      IKToken(kToken).transferUnderlyingTo(vars.user, vars.amount);
-    }
-  }
-
   function _addReserveToList(address asset) internal {
     uint256 reservesCount = _reservesCount;
 
@@ -773,111 +633,52 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     address shortAsset,
     address longAsset,
     uint256 collateralAmount,
-    uint256 leverage
+    uint256 leverage,
+    uint256 minLongAmountOut,
+    address onBehalfOf
   )
     external
+    override
     whenNotPaused
     whenPositionNotPaused
     returns (
       DataTypes.TraderPosition memory position
     )
   {
-    require(shortAsset != longAsset, Errors.GetError(Errors.Error.LP_POSITION_INVALID));
-    require((leverage < _maximumLeverage) && (leverage >= 10**27), Errors.GetError(Errors.Error.LP_LEVERAGE_INVALID));
-
-    DataTypes.ReserveData storage shortReserve = _reserves[shortAsset];
-
-    uint256 supplyTokenAmount = collateralAmount.rayMul(leverage);
-    uint256 amountToShort = GenericLogic.calculateAmountToShort(collateralAsset, shortAsset, supplyTokenAmount, _reserves, _addressesProvider.getPriceOracle());
-
-    ValidationLogic.validateOpenPosition(_reserves[collateralAsset], shortReserve, _reserves[longAsset], collateralAmount, amountToShort);
-
-    IERC20(collateralAsset).safeTransferFrom(msg.sender, address(this), collateralAmount);
-    
-    shortReserve.updateState();
-    IDToken(shortReserve.dTokenAddress).mint(
-        msg.sender,
-        address(this),
-        amountToShort,
-        shortReserve.borrowIndex
-      );
-
-    shortReserve.updateInterestRates(
-      shortAsset,
-      shortReserve.kTokenAddress,
-      0,
-      amountToShort
+    position = MarginLogic.openPosition(
+      MarginLogic.OpenPositionCallVars({
+        collateralAsset: collateralAsset,
+        shortAsset: shortAsset,
+        longAsset: longAsset,
+        collateralAmount: collateralAmount,
+        leverage: leverage,
+        minLongAmountOut: minLongAmountOut,
+        onBehalfOf: onBehalfOf,
+        vaultAddress: address(this), // TODO: change to another vault
+        maximumLeverage: _maximumLeverage,
+        positionLiquidationThreshold: _positionLiquidationThreshold,
+        positionsCount: _positionsCount,
+        swapRouterAddress: _addressesProvider.getSwapRouter(),
+        oracleAddress: _addressesProvider.getPriceOracle()
+      }),
+      _reserves
     );
-
-    // if this fails, means there is not enough balance
-    IKToken(shortReserve.kTokenAddress).transferUnderlyingTo(address(this), amountToShort);
-
-    // transfer short into long through dex
-    // TODO: validate after swap
-    uint256 longAmount;
-    {
-      IKSwapRouter swapRouter = IKSwapRouter(_addressesProvider.getSwapRouter());
-      IERC20(shortAsset).safeTransfer(address(swapRouter), amountToShort);
-      (, longAmount) = swapRouter.SwapExactTokensForTokens(
-        shortAsset,
-        longAsset,
-        amountToShort,
-        address(this)
-      );
-    }
-
-    position = DataTypes.TraderPosition(
-      // the trader
-      msg.sender,
-      // the token as margin
-      collateralAsset,
-      // the token to borrow
-      shortAsset,
-      // the token held
-      longAsset,
-      // the amount of provided margin
-      collateralAmount,
-      // the amount of borrowed asset
-      amountToShort,
-      // the amount of held asset
-      longAmount,
-      // the liquidationThreshold at trade
-      _positionLiquidationThreshold,
-      // id of position
-      _positionsCount,
-      // position is open
-      true
-    );
-
     _addPositionToList(position);
-    _addTraderToList(msg.sender);
-
-    emit OpenPosition(
-      // the trader
-      msg.sender,
-      // the token as margin
-      collateralAsset,
-      // the token to borrow
-      shortAsset,
-      // the amount of provided margin
-      collateralAmount,
-      // the amount of borrowed asset
-      amountToShort,
-      // the liquidationThreshold at trade
-      _positionLiquidationThreshold,
-      // id of position
-      _positionsCount
-    );
+    _addTraderToList(onBehalfOf);
   }
 
   /**
    * @dev Close a position, swap all margin / pnl into paymentAsset
-   * @param id The id of position
+   * @param positionId The id of position
    * @return paymentAmount The amount of asset to payback user 
    * @return pnl The pnl in ETH (wad)
    **/
   function closePosition(
-    uint256 id
+    uint256 positionId,
+    address to,
+    uint256 minLongToShortAmountOut,
+    uint256 minShortToCollateralAmountOut,
+    uint256 minCollateralToShortAmountOut
   )
     external
     override
@@ -888,22 +689,22 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
       int256 pnl
     )
   {
-    DataTypes.TraderPosition storage position = _positionsList[id];
-    address shortTokenAddress = position.shortTokenAddress;
-    ValidationLogic.validateClosePosition(msg.sender, position);
-
-    pnl = GenericLogic.getPnL(position, _reserves, _addressesProvider.getPriceOracle());
-
-    paymentAmount = _closePosition(position, msg.sender, address(this));
-
-    emit ClosePosition(
-      id,
-      position.traderAddress,
-      position.collateralTokenAddress,
-      position.collateralAmount,
-      shortTokenAddress,
-      position.shortAmount
-    );
+    (paymentAmount, pnl) =
+      MarginLogic.closePosition(
+        MarginLogic.ClosePositionCallVars({
+          id: positionId,
+          to: to,
+          vaultAddress: address(this),
+          minLongToShortAmountOut: minLongToShortAmountOut,
+          minShortToCollateralAmountOut: minShortToCollateralAmountOut,
+          minCollateralToShortAmountOut: minCollateralToShortAmountOut,
+          swapRouterAddress: _addressesProvider.getSwapRouter(),
+          oracleAddress: _addressesProvider.getPriceOracle()
+        }),
+        _reserves,
+        _usersConfig,
+        _positionsList
+      );
   }
 
   /**
@@ -918,146 +719,15 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
     whenNotPaused
     whenPositionNotPaused
   {
-    DataTypes.TraderPosition storage position = _positionsList[id];
-
-    ValidationLogic.validateLiquidationCallPosition(
-        position,
-        _reserves,
-        _addressesProvider.getPriceOracle()
-      );
-    
-    _liquidationCallPosition(position, msg.sender);
-
-    emit LiquidationCallPosition(
-      id,
-      msg.sender,
-      position.traderAddress,
-      position.collateralTokenAddress,
-      position.collateralAmount,
-      position.shortTokenAddress,
-      position.shortAmount
+    LiquidationLogic.liquidationCallPosition(
+      LiquidationLogic.LiquidationCallPositionCallVars({
+        id: id,
+        oracleAddress: _addressesProvider.getPriceOracle()
+      }),
+      _reserves,
+      _usersConfig,
+      _positionsList
     );
-    emit ClosePosition(
-      id,
-      position.traderAddress,
-      position.collateralTokenAddress,
-      position.collateralAmount,
-      position.shortTokenAddress,
-      position.shortAmount
-    );
-  }
-
-  function _closePosition(
-    DataTypes.TraderPosition storage position,
-    address receiver,
-    address pool
-  ) internal returns (uint256 paymentAmount) {
-    // swap the longAsset into shortAsset first, compensate using collateral if there are losses
-    {
-      uint256 returnShortAmount;
-      IKSwapRouter swapRouter = IKSwapRouter(_addressesProvider.getSwapRouter());
-
-      {
-        IERC20(position.longTokenAddress).safeTransfer(address(swapRouter), position.longAmount);
-        (, returnShortAmount) = swapRouter.SwapExactTokensForTokens(
-          position.longTokenAddress,
-          position.shortTokenAddress,
-          position.longAmount,
-          address(this)
-        );
-      }
-
-      if (position.shortAmount <= returnShortAmount) {
-        paymentAmount = 0;
-
-        if (position.shortAmount < returnShortAmount) {
-          IERC20(position.longTokenAddress)
-            .safeTransfer(address(swapRouter), returnShortAmount.sub(position.shortAmount));
-          (, paymentAmount) = swapRouter.SwapExactTokensForTokens(
-            position.shortTokenAddress,
-            position.collateralTokenAddress,
-            returnShortAmount.sub(position.shortAmount),
-            address(this)
-          );
-        }
-        paymentAmount.add(position.collateralAmount);
-      } else {
-        IERC20(position.longTokenAddress)
-            .safeTransfer(address(swapRouter), position.shortAmount.sub(returnShortAmount));
-        (, uint256 collateralSpent) = swapRouter.SwapExactTokensForTokens(
-            position.collateralTokenAddress,
-            position.shortTokenAddress,
-            position.shortAmount.sub(returnShortAmount),
-            address(this)
-          );
-        paymentAmount = position.collateralAmount.sub(collateralSpent);
-      }
-
-    }
-    // repay
-    DataTypes.ReserveData storage shortReserve = _reserves[position.shortTokenAddress];
-
-    uint256 paybackAmount = position.shortAmount;
-
-    shortReserve.updateState();
-
-    {
-      IDToken(shortReserve.dTokenAddress).burn(
-        pool,
-        paybackAmount,
-        shortReserve.borrowIndex
-      );
-    }
-    {
-      address kToken = shortReserve.kTokenAddress;
-      shortReserve.updateInterestRates(position.shortTokenAddress, kToken, paybackAmount, 0);
-
-      uint256 variableDebt = IERC20(position.shortTokenAddress).balanceOf(pool);
-      if (variableDebt.sub(paybackAmount) == 0) {
-        _usersConfig[pool].isBorrowing[shortReserve.id] = false;
-      }
-
-      IERC20(position.shortTokenAddress).safeTransfer(kToken, paybackAmount);
-
-      IKToken(kToken).handleRepayment(pool, paybackAmount);
-    }
-    {
-      _positionsList[position.id].isOpen = false;
-      IERC20(position.collateralTokenAddress).safeTransfer(receiver, paymentAmount);
-    }
-  }
-
-  function _liquidationCallPosition(
-    DataTypes.TraderPosition storage position,
-    address caller
-  ) internal {
-    // repay
-    DataTypes.ReserveData storage shortReserve = _reserves[position.shortTokenAddress];
-
-    shortReserve.updateState();
-    IDToken(shortReserve.dTokenAddress).burn(
-      address(this),
-      position.shortAmount,
-      shortReserve.borrowIndex
-    );
-
-    shortReserve.updateInterestRates(position.shortTokenAddress, shortReserve.kTokenAddress, position.shortAmount, 0);
-
-    uint256 variableDebt = IERC20(position.shortTokenAddress).balanceOf(address(this));
-    if (variableDebt.sub(position.shortAmount) == 0) {
-      _usersConfig[address(this)].isBorrowing[shortReserve.id] = false;
-    }
-
-    IERC20(position.shortTokenAddress).safeTransferFrom(
-      caller,
-      shortReserve.kTokenAddress,
-      position.shortAmount
-    );
-    IKToken(shortReserve.kTokenAddress).handleRepayment(address(this), position.shortAmount);
-
-    _positionsList[position.id].isOpen = false;
-    IERC20(position.longTokenAddress).safeTransfer(caller, position.longAmount);
-    IERC20(position.collateralTokenAddress).safeTransfer(caller, position.collateralAmount);
   }
 
   function _addPositionToList(DataTypes.TraderPosition memory position) internal {
@@ -1088,5 +758,4 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
   function name() external view override returns (string memory) {
     return _name;
   }
-
 }

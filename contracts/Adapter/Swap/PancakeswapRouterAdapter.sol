@@ -28,10 +28,10 @@ contract PancakeswapRouterAdapter is IKSwapRouter, Ownable {
     address tokenIn,
     address tokenOut,
     uint256 amountOut,
+    uint256 amountInMax,
     address recipient
   ) external override returns (uint256 _amountIn, uint256 _amountOut) {
     uint256 deadline = type(uint256).max;
-    uint256 amountInMax = type(uint256).max;
     address[] memory path = new address[](2);
     // TODO: check
     path[0] = tokenIn;
@@ -60,10 +60,10 @@ contract PancakeswapRouterAdapter is IKSwapRouter, Ownable {
     address tokenIn,
     address tokenOut,
     uint256 amountIn,
+    uint256 amountOutMin,
     address recipient
   ) external override returns (uint256 _amountIn, uint256 _amountOut) {
     uint256 deadline = type(uint256).max;
-    uint256 amountOutMin = 0;
     // TODO: check
     address[] memory path = new address[](2);
     path[0] = tokenIn;

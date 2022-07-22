@@ -174,7 +174,7 @@ contract DToken is KERC20('DEBTTOKEN_IMPL', 'DEBTTOKEN_IMPL', 0), IDToken {
     uint256 index
   ) external override onlyLendingPool returns (bool) {
     // NOTE: we let pool to have infinite borrow ability
-    if (user != onBehalfOf && onBehalfOf != address(_getLendingPool())) {
+    if (user != onBehalfOf) {
       _decreaseBorrowAllowance(onBehalfOf, user, amount);
     }
 

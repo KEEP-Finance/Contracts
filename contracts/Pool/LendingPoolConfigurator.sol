@@ -166,9 +166,9 @@ contract LendingPoolConfigurator is ILendingPoolConfigurator {
       );
     } else {
       require(liquidationBonus == 0, Errors.GetError(Errors.Error.LPC_INVALID_CONFIGURATION));
-      //if the liquidation threshold is being set to 0,
+      // if the liquidation threshold is being set to 0,
       // the reserve is being disabled as collateral. To do so,
-      //we need to ensure no liquidity is deposited
+      // we need to ensure no liquidity is supplied
       _checkNoLiquidity(asset);
     }
 
@@ -230,7 +230,7 @@ contract LendingPoolConfigurator is ILendingPoolConfigurator {
   }
 
   /**
-   * @dev Freezes a reserve. A frozen reserve doesn't allow any new deposit, borrow or rate swap
+   * @dev Freezes a reserve. A frozen reserve doesn't allow any new supply, borrow or rate swap
    *  but allows repayments, liquidations, rate rebalances and withdrawals
    * @param asset The address of the underlying asset of the reserve
    **/

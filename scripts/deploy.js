@@ -57,11 +57,37 @@ async function main() {
   let validation_logic = await ValidationLogic.deploy();
   await reserve_logic.deployed();
   await validation_logic.deployed();
+  const LiquidationLogic = await hre.ethers.getContractFactory("LiquidationLogic", {libraries: {
+    ValidationLogic: validation_logic.address,
+  }});
+  const MarginLogic = await hre.ethers.getContractFactory("MarginLogic", {libraries: {
+    ValidationLogic: validation_logic.address,
+    GenericLogic: generic_logic.address
+  }});
+  const MarketLogic = await hre.ethers.getContractFactory("MarketLogic", {libraries: {
+    ValidationLogic: validation_logic.address,
+  }});
+  let liquidation_logic = await LiquidationLogic.deploy();
+  let margin_logic = await MarginLogic.deploy();
+  let market_logic = await MarketLogic.deploy();
+  await liquidation_logic.deployed();
+  await margin_logic.deployed();
+  await market_logic.deployed();
   
   let library = {libraries: {ReserveLogic: reserve_logic.address, ValidationLogic: validation_logic.address, GenericLogic: generic_logic.address}}
 
   // 5. deploy 2 lending pools: main and eth-usdc
-  const LendingPool = await hre.ethers.getContractFactory("LendingPool", {libraries: {ReserveLogic: reserve_logic.address, ValidationLogic: validation_logic.address, GenericLogic: generic_logic.address}});
+  const LendingPool =
+    await hre.ethers.getContractFactory(
+      "LendingPool", {
+      libraries: {
+        ReserveLogic: reserve_logic.address,
+        ValidationLogic: validation_logic.address,
+        GenericLogic: generic_logic.address,
+        LiquidationLogic: liquidation_logic.address,
+        MarginLogic: margin_logic.address,
+        MarketLogic: market_logic.address
+      }});
   let main_pool = await LendingPool.deploy(address_provider.address, 'main');
   let eth_usdc_pool = await LendingPool.deploy(address_provider.address, 'eth-usdc');
   await main_pool.deployed();
@@ -112,25 +138,14 @@ async function main() {
   console.log("Main pool configurator address: ", main_pool_configurator.address);
   console.log("ETH-USDC pool configurator address: ", eth_usdc_pool_configurator.address);
 
-  // 8. deploy collateral manager
-  const LendingPoolCollateralManager = await hre.ethers.getContractFactory("LendingPoolCollateralManager");
-  let main_pool_cm = await LendingPoolCollateralManager.deploy();
-  let eth_usdc_pool_cm = await LendingPoolCollateralManager.deploy();
-  await main_pool_cm.deployed();
-  await eth_usdc_pool_cm.deployed();
-  console.log("Main pool cm address: ", main_pool_cm.address);
-  console.log("ETH-USDC pool cm address: ", eth_usdc_pool_cm.address);
-
   // 9. add 2 pools to address provider
   await address_provider.addPool(
     main_pool.address,
-    main_pool_configurator.address,
-    main_pool_cm.address
+    main_pool_configurator.address
   );
   await address_provider.addPool(
     eth_usdc_pool.address,
-    eth_usdc_pool_configurator.address,
-    eth_usdc_pool_cm.address
+    eth_usdc_pool_configurator.address
   );
   console.log("Pools registered");
 
@@ -262,13 +277,13 @@ async function main() {
   await ETH.approve(main_pool.address, parseUnits("1", 50));
   await MATIC.approve(main_pool.address, parseUnits("1", 50));
 
-  await main_pool.deposit(ETH.address, parseUnits("1", 20), deployer.address)
+  await main_pool.supply(ETH.address, parseUnits("1", 20), deployer.address)
   await main_pool.setUserUseReserveAsCollateral(ETH.address, true)
   await main_pool.borrow(ETH.address, parseUnits("1", 18), 1, deployer.address)
-  // test position
-  await main_pool.openPosition(USDC.address, ETH.address, USDC.address, parseUnits("1", 6), parseUnits("5", 27));
-  let data1 = await main_pool.getTraderPositions(deployer.address);
-  console.log(data1)
+  // test position TODO
+  // await main_pool.openPosition(USDC.address, ETH.address, USDC.address, parseUnits("1", 6), parseUnits("5", 27));
+  // let data1 = await main_pool.getTraderPositions(deployer.address);
+  // console.log(data1)
 }
 
 // We recommend this pattern to be able to use async/await everywhere

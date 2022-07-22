@@ -6,6 +6,7 @@ interface IKSwapRouter {
     address tokenIn,
     address tokenOut,
     uint256 amountOut,
+    uint256 amountInMax,
     address recipient
   ) external returns (uint256 _amountIn, uint256 _amountOut);
 
@@ -13,6 +14,7 @@ interface IKSwapRouter {
     address tokenIn,
     address tokenOut,
     uint256 amountIn,
+    uint256 amountOutMin,
     address recipient
   ) external returns (uint256 _amountIn, uint256 _amountOut);
 
