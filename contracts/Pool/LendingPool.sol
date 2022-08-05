@@ -70,15 +70,15 @@ contract LendingPool is ILendingPool, LendingPoolStorage {
   ) {
     _addressesProvider = provider;
     _maxNumberOfReserves = type(uint256).max; // unlimit reserve number at first
-    _maximumLeverage = 20 * (10**27); // 20 ray
-    _positionLiquidationThreshold = 2 * (10**25); // 0.02 ray
+    _maximumLeverage = 20 * WadRayMath.ray(); // 20 ray
+    _positionLiquidationThreshold = WadRayMath.ray() / 50; // 0.02 ray
     _name = poolName;
     _flashLoanPremiumTotal = 5; // 0.05% premium for each flashLoan call
   }
 
   /**
    * @dev Supply an `amount` of underlying asset into the reserve, receiving in return overlying kTokens.
-   * - E.g. User supplies 100 USDC and gets in return 100 aUSDC
+   * - E.g. User supplies 100 USDC and gets in return 100 kUSDC
    * @param asset The address of the underlying asset to supply
    * @param amount The amount to be supplied
    * @param onBehalfOf The address that will receive the kTokens, same as msg.sender if the user

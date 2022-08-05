@@ -144,7 +144,7 @@ library ReserveLogic {
   /**
    * @dev Initializes a reserve
    * @param reserve The reserve object
-   * @param kTokenAddress The address of the overlying atoken contract
+   * @param kTokenAddress The address of the overlying kToken contract
    * @param interestRateStrategyAddress The address of the interest rate strategy contract
    **/
   function init(
@@ -295,8 +295,8 @@ library ReserveLogic {
 
       reserve.liquidityIndex = uint128(newLiquidityIndex);
 
-      //as the liquidity rate might come only from stable rate loans, we need to ensure
-      //that there is actual variable debt before accumulating
+      // as the liquidity rate might come only from flash loans, we need to ensure
+      // that there is actual variable debt before accumulating
       if (scaledDebt != 0) {
         uint256 cumulatedVariableBorrowInterest =
           MathUtils.calculateCompoundedInterest(reserve.currentBorrowRate, timestamp);

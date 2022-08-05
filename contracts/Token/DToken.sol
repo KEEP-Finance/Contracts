@@ -251,14 +251,14 @@ contract DToken is KERC20('DEBTTOKEN_IMPL', 'DEBTTOKEN_IMPL', 0), IDToken {
   }
 
   /**
-   * @dev Returns the address of the underlying asset of this aToken (E.g. WETH for aWETH)
+   * @dev Returns the address of the underlying asset of this kToken (E.g. WETH for aWETH)
    **/
   function UNDERLYING_ASSET_ADDRESS() public view returns (address) {
     return _underlyingAsset;
   }
 
   /**
-   * @dev Returns the address of the lending pool where this aToken is used
+   * @dev Returns the address of the lending pool where this kToken is used
    **/
   function POOL() public view returns (ILendingPool) {
     return _pool;

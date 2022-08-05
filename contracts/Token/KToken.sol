@@ -113,7 +113,7 @@ contract KToken is KERC20('KTOKEN_IMPL', 'KTOKEN_IMPL', 0), IKToken {
   }
 
   /**
-   * @dev Transfers kTokens in the event of a borrow being liquidated, in case the liquidators reclaims the aToken
+   * @dev Transfers kTokens in the event of a borrow being liquidated, in case the liquidators reclaims the kToken
    * - Only callable by the LendingPool
    * @param from The address getting liquidated, current owner of the kTokens
    * @param to The recipient
@@ -195,7 +195,7 @@ contract KToken is KERC20('KTOKEN_IMPL', 'KTOKEN_IMPL', 0), IKToken {
   }
 
   /**
-   * @dev Returns the address of the Aave treasury, receiving the fees on this aToken
+   * @dev Returns the address of the Aave treasury, receiving the fees on this kToken
    **/
   function RESERVE_TREASURY_ADDRESS() public view returns (address) {
     return _treasury;

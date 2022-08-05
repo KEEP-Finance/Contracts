@@ -21,7 +21,7 @@ interface IDataProvider {
   function getAllPoolData() external view returns (PoolData[] memory);
   function getAddressesProvider() external view returns (ILendingPoolAddressesProvider);
   function getAllReservesTokens(uint id) external view returns (TokenData[] memory);
-  function getAllATokens(uint id) external view returns (TokenData[] memory);
+  function getAllKTokens(uint id) external view returns (TokenData[] memory);
   function getReserveConfigurationData(uint id, address asset)
     external
     view
@@ -58,7 +58,7 @@ interface IDataProvider {
     external
     view
     returns (
-      address aTokenAddress,
+      address kTokenAddress,
       address variableDebtTokenAddress
     );
 

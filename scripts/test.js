@@ -279,6 +279,24 @@ async function main() {
   await data_provider.deployed();
   console.log("Data provider address: ", data_provider.address);
 
+  // TEST ONLY
+  await USDC.approve(main_pool.address, parseUnits("1", 50));
+  await ETH.approve(main_pool.address, parseUnits("1", 50));
+  await MATIC.approve(main_pool.address, parseUnits("1", 50));
+
+  await main_pool.supply(ETH.address, parseUnits("1", 20), deployer.address)
+  await main_pool.setUserUseReserveAsCollateral(ETH.address, true)
+  await main_pool.borrow(ETH.address, parseUnits("1", 18), 1, deployer.address)
+  // test position TODO
+  // await main_pool.openPosition(USDC.address, ETH.address, USDC.address, parseUnits("1", 6), parseUnits("5", 27), 0, deployer.address);
+  // let data1 = await main_pool.getTraderPositions(deployer.address);
+  // console.log(data1)
+  await USDC.approve(eth_usdc_pool.address, parseUnits("1", 50));
+  await eth_usdc_pool.supply(USDC.address, parseUnits("1", 8), deployer.address)
+  await eth_usdc_pool.borrow(USDC.address, parseUnits("7", 7), 1, deployer.address)
+  let eth_usdc_pool_id = await address_provider.getLendingPoolID(eth_usdc_pool.address);
+  let data = await data_provider.getUserReserveData(eth_usdc_pool_id, USDC.address, deployer.address)
+  console.log(data)
 }
 
 // We recommend this pattern to be able to use async/await everywhere

@@ -64,19 +64,19 @@ contract DataProvider is IDataProvider {
     return reservesTokens;
   }
 
-  function getAllATokens(uint id) external view override returns (TokenData[] memory) {
+  function getAllKTokens(uint id) external view override returns (TokenData[] memory) {
     (address pool_address,) = ADDRESSES_PROVIDER.getLendingPool(id);
     ILendingPool pool = ILendingPool(pool_address);
     address[] memory reserves = pool.getReservesList();
-    TokenData[] memory aTokens = new TokenData[](reserves.length);
+    TokenData[] memory kTokens = new TokenData[](reserves.length);
     for (uint256 i = 0; i < reserves.length; i++) {
       DataTypes.ReserveData memory reserveData = pool.getReserveData(reserves[i]);
-      aTokens[i] = TokenData({
+      kTokens[i] = TokenData({
         symbol: IERC20Detailed(reserveData.kTokenAddress).symbol(),
         tokenAddress: reserveData.kTokenAddress
       });
     }
-    return aTokens;
+    return kTokens;
   }
 
   function getReserveConfigurationData(uint id, address asset)
@@ -157,7 +157,7 @@ contract DataProvider is IDataProvider {
     view
     override
     returns (
-      address aTokenAddress,
+      address kTokenAddress,
       address variableDebtTokenAddress
     )
   {

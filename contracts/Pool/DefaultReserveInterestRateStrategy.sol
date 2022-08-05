@@ -128,7 +128,7 @@ contract DefaultReserveInterestRateStrategy is IReserveInterestRateStrategy {
    * NOTE This function is kept for compatibility with the previous DefaultInterestRateStrategy interface.
    * New protocol implementation uses the new calculateInterestRates() interface
    * @param asset The address of the reserve
-   * @param availableLiquidity The liquidity available in the corresponding aToken
+   * @param availableLiquidity The liquidity available in the corresponding kToken
    * @param totalVariableDebt The total borrowed from the reserve at a variable rate
    * @param reserveFactor The reserve portion of the interest that goes to the treasury of the market
    * @return The liquidity rate and the variable borrow rate

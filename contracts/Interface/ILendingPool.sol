@@ -10,7 +10,7 @@ interface ILendingPool {
    * @dev Emitted on supply()
    * @param reserve The address of the underlying asset of the reserve
    * @param user The address initiating the supply
-   * @param onBehalfOf The beneficiary of the supply, receiving the aTokens
+   * @param onBehalfOf The beneficiary of the supply, receiving the kTokens
    * @param amount The amount supplied
    **/
   event Supply(
@@ -23,7 +23,7 @@ interface ILendingPool {
   /**
    * @dev Emitted on withdraw()
    * @param reserve The address of the underlyng asset being withdrawn
-   * @param user The address initiating the withdrawal, owner of aTokens
+   * @param user The address initiating the withdrawal, owner of kTokens
    * @param to Address that will receive the underlying
    * @param amount The amount to be withdrawn
    **/
@@ -114,7 +114,7 @@ interface ILendingPool {
    * @param debtToCover The debt amount of borrowed `asset` the liquidator wants to cover
    * @param liquidatedCollateralAmount The amount of collateral received by the liiquidator
    * @param liquidator The address of the liquidator
-   * @param receiveAToken `true` if the liquidators wants to receive the collateral aTokens, `false` if he wants
+   * @param receivekToken `true` if the liquidators wants to receive the collateral kTokens, `false` if he wants
    * to receive the underlying collateral asset directly
    **/
   event LiquidationCall(
@@ -124,7 +124,7 @@ interface ILendingPool {
     uint256 debtToCover,
     uint256 liquidatedCollateralAmount,
     address liquidator,
-    bool receiveAToken
+    bool receivekToken
   );
 
   /**
@@ -186,13 +186,13 @@ interface ILendingPool {
     uint256 balanceToBefore
   ) external;
 
-    /**
-   * @dev Supply an `amount` of underlying asset into the reserve, receiving in return overlying aTokens.
-   * - E.g. User supplies 100 USDC and gets in return 100 aUSDC
+  /**
+   * @dev Supply an `amount` of underlying asset into the reserve, receiving in return overlying kTokens.
+   * - E.g. User supplies 100 USDC and gets in return 100 kUSDC
    * @param asset The address of the underlying asset to supply
    * @param amount The amount to be supplied
-   * @param onBehalfOf The address that will receive the aTokens, same as msg.sender if the user
-   *   wants to receive them on his own wallet, or a different address if the beneficiary of aTokens
+   * @param onBehalfOf The address that will receive the kTokens, same as msg.sender if the user
+   *   wants to receive them on his own wallet, or a different address if the beneficiary of kTokens
    *   is a different wallet
    **/
   function supply(
@@ -202,11 +202,11 @@ interface ILendingPool {
   ) external;
 
   /**
-   * @dev Withdraws an `amount` of underlying asset from the reserve, burning the equivalent aTokens owned
-   * E.g. User has 100 aUSDC, calls withdraw() and receives 100 USDC, burning the 100 aUSDC
+   * @dev Withdraws an `amount` of underlying asset from the reserve, burning the equivalent kTokens owned
+   * E.g. User has 100 kUSDC, calls withdraw() and receives 100 USDC, burning the 100 kUSDC
    * @param asset The address of the underlying asset to withdraw
    * @param amount The underlying amount to be withdrawn
-   *   - Send the value type(uint256).max in order to withdraw the whole aToken balance
+   *   - Send the value type(uint256).max in order to withdraw the whole kToken balance
    * @param to Address that will receive the underlying, same as msg.sender if the user
    *   wants to receive it on his own wallet, or a different address if the beneficiary is a
    *   different wallet
@@ -292,7 +292,7 @@ interface ILendingPool {
    * @param debtAsset The address of the underlying borrowed asset to be repaid with the liquidation
    * @param user The address of the borrower getting liquidated
    * @param debtToCover The debt amount of borrowed `asset` the liquidator wants to cover
-   * @param receiveAToken `true` if the liquidators wants to receive the collateral aTokens, `false` if he wants
+   * @param receivekToken `true` if the liquidators wants to receive the collateral kTokens, `false` if he wants
    * to receive the underlying collateral asset directly
    **/
   function liquidationCall(
@@ -300,7 +300,7 @@ interface ILendingPool {
     address debtAsset,
     address user,
     uint256 debtToCover,
-    bool receiveAToken
+    bool receivekToken
   ) external;
 
   /**

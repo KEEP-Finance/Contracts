@@ -20,7 +20,6 @@ module.exports = {
     // Mumbai: {
     //   url: "https://matic-mumbai.chainstacklabs.com",
     //   accounts: [`0x${PRIVATE_KEY}`],
-    //   gasPrice: 8000000000, // default is 'auto' which breaks chains without the london hardfork
     // },
     // BscTestnet: {
     //   url: "https://data-seed-prebsc-1-s3.binance.org:8545",

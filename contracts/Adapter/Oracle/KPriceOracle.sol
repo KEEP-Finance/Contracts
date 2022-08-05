@@ -17,7 +17,7 @@ contract KPriceOracle is IPriceOracleGetter, Ownable {
   uint256 public immutable BASE_CURRENCY_UNIT;
   uint8 internal immutable BASE_DECIMALS;
 
-  /// @notice Constructor
+  /// @dev Constructor
   /// @param assets The addresses of the assets
   /// @param sources The address of the source of each asset
   /// @param fallbackOracle The address of the fallback oracle to use if the data of an
@@ -39,7 +39,7 @@ contract KPriceOracle is IPriceOracleGetter, Ownable {
     emit BaseCurrencySet(baseCurrency, 10**baseDecimals);
   }
 
-  /// @notice External function called by the Aave governance to set or replace sources of assets
+  /// @dev External function called by the governance to set or replace sources of assets
   /// @param assets The addresses of the assets
   /// @param sources The address of the source of each asset
   function setAssetSources(address[] calldata assets, address[] calldata sources)
@@ -49,8 +49,8 @@ contract KPriceOracle is IPriceOracleGetter, Ownable {
     _setAssetsSources(assets, sources);
   }
 
-  /// @notice Sets the fallbackOracle
-  /// - Callable only by the Aave governance
+  /// @dev Sets the fallbackOracle
+  /// - Callable only by the governance
   /// @param fallbackOracle The address of the fallbackOracle
   function setFallbackOracle(address fallbackOracle) external onlyOwner {
     _setFallbackOracle(fallbackOracle);

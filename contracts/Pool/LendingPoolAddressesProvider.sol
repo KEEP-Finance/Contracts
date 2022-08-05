@@ -26,153 +26,142 @@ contract LendingPoolAddressesProvider is Ownable, ILendingPoolAddressesProvider 
   mapping(address => bool) private lendingPoolValid;
 
   constructor(
-    address main_admin,
-    address emergency_admin,
-    address oracle,
-    address swapRouterAddr_
+    address mainAdmin,
+    address emergencyAdmin,
+    address oracleAddress,
+    address swapRouterAddress
   ) {
-    _addresses[MAIN_ADMIN] = main_admin;
-    _addresses[EMERGENCY_ADMIN] = emergency_admin;
-    _addresses[PRICE_ORACLE] = oracle;
-    _addresses[SWAP_ROUTER] = swapRouterAddr_;
+    _addresses[MAIN_ADMIN] = mainAdmin;
+    _addresses[EMERGENCY_ADMIN] = emergencyAdmin;
+    _addresses[PRICE_ORACLE] = oracleAddress;
+    _addresses[SWAP_ROUTER] = swapRouterAddress;
   }
 
-  function _add_lending_pool(
-    address lending_pool_address,
-    address lending_pool_configurator_address
+  function _addPool(
+    address poolAddress,
+    address poolConfiguratorAddress
   ) internal {
-    require(lendingPoolValid[lending_pool_address] != true, Errors.GetError(Errors.Error.LENDING_POOL_EXIST));
-    lendingPoolValid[lending_pool_address] = true;
-    lendingPoolID[lending_pool_address] = lendingPoolAddressArray.length;
-    lendingPoolAddressArray.push(lending_pool_address);
-    lendingPoolConfigurator[lending_pool_address] = lending_pool_configurator_address;
-    emit PoolAdded(lending_pool_address, lending_pool_configurator_address);
+    require(lendingPoolValid[poolAddress] != true, Errors.GetError(Errors.Error.LENDING_POOL_EXIST));
+    lendingPoolValid[poolAddress] = true;
+    lendingPoolID[poolAddress] = lendingPoolAddressArray.length;
+    lendingPoolAddressArray.push(poolAddress);
+    lendingPoolConfigurator[poolAddress] = poolConfiguratorAddress;
+    emit PoolAdded(poolAddress, poolConfiguratorAddress);
   }
 
-  function _remove_lending_pool(address lending_pool_address) internal {
-    require(lendingPoolValid[lending_pool_address] == true, Errors.GetError(Errors.Error.LENDING_POOL_NONEXIST));
-    delete lendingPoolValid[lending_pool_address];
-    delete lendingPoolConfigurator[lending_pool_address];
-    delete lendingPoolID[lending_pool_address];
-    emit PoolRemoved(lending_pool_address);
+  function _removePool(address poolAddress) internal {
+    require(lendingPoolValid[poolAddress] == true, Errors.GetError(Errors.Error.LENDING_POOL_NONEXIST));
+    delete lendingPoolValid[poolAddress];
+    delete lendingPoolConfigurator[poolAddress];
+    delete lendingPoolID[poolAddress];
+    emit PoolRemoved(poolAddress);
   }
 
   function getAllPools() external override view returns (address[] memory) {
-    uint pool_length = lendingPoolAddressArray.length;
-    uint pool_number = 0;
-    for (uint i = 0; i < pool_length; i++) {
-        address curr_pool_address = lendingPoolAddressArray[i];
-        if (lendingPoolValid[curr_pool_address] == true) {
-            pool_number = pool_number + 1;
+    uint cachedPoolLength = lendingPoolAddressArray.length;
+    uint poolNumber = 0;
+    for (uint i = 0; i < cachedPoolLength; i++) {
+        address cachedPoolAddress = lendingPoolAddressArray[i];
+        if (lendingPoolValid[cachedPoolAddress] == true) {
+            poolNumber = poolNumber + 1;
         }
     }
-    address[] memory all_pools = new address[](pool_number);
+    address[] memory validPools = new address[](poolNumber);
 
     uint idx = 0;
-    for (uint i = 0; i < pool_length; i++) {
-        address curr_pool_address = lendingPoolAddressArray[i];
-        if (lendingPoolValid[curr_pool_address] == true) {
-            all_pools[idx] = curr_pool_address;
+    for (uint i = 0; i < cachedPoolLength; i++) {
+        address cachedPoolAddress = lendingPoolAddressArray[i];
+        if (lendingPoolValid[cachedPoolAddress] == true) {
+            validPools[idx] = cachedPoolAddress;
             idx = idx + 1;
         }
     }
-    return all_pools;
+    return validPools;
   }
 
-  function addPool(address pool_address, address lending_pool_configurator_address) external override onlyOwner {
-    _add_lending_pool(pool_address, lending_pool_configurator_address);
+  /// @inheritdoc ILendingPoolAddressesProvider
+  function addPool(address poolAddress, address poolConfiguratorAddress) external override onlyOwner {
+    _addPool(poolAddress, poolConfiguratorAddress);
   }
 
-  function removePool(address pool_address) external override onlyOwner {
-    _remove_lending_pool(pool_address);
+  /// @inheritdoc ILendingPoolAddressesProvider
+  function removePool(address poolAddress) external override onlyOwner {
+    _removePool(poolAddress);
   }
 
-  function deployAddPool(bytes32 data) external override onlyOwner returns (address) {
-    return address(0);
-  }
-
-  /**
-   * @dev Returns the address of the LendingPool proxy
-   * @return The LendingPool proxy address
-   **/
+  /// @inheritdoc ILendingPoolAddressesProvider
   function getLendingPool(uint id) external view override returns (address, bool) {
     return (lendingPoolAddressArray[id], lendingPoolValid[lendingPoolAddressArray[id]]);
   }
 
+  /// @inheritdoc ILendingPoolAddressesProvider
   function getLendingPoolID(address pool) external view override returns (uint) {
     return lendingPoolID[pool];
   }
 
+  /// @inheritdoc ILendingPoolAddressesProvider
   function getLendingPoolConfigurator(address pool) external view override returns (address) {
     return lendingPoolConfigurator[pool];
   }
 
-  /**
-   * @dev Updates the address of the LendingPool
-   * @param pool The new LendingPool implementation
-   **/
-  function setLendingPool(uint id, address pool, address lending_pool_configurator_address) external override onlyOwner {
+  /// @inheritdoc ILendingPoolAddressesProvider
+  function setLendingPool(uint id, address pool, address poolConfiguratorAddress) external override onlyOwner {
     lendingPoolAddressArray[id] = pool;
     lendingPoolValid[pool] = true;
-    lendingPoolConfigurator[pool] = lending_pool_configurator_address;
-    emit LendingPoolUpdated(id, pool, lending_pool_configurator_address);
+    lendingPoolConfigurator[pool] = poolConfiguratorAddress;
+    emit LendingPoolUpdated(id, pool, poolConfiguratorAddress);
   }
 
-  /**
-   * @dev Sets an address for an id replacing the address saved in the addresses map
-   * IMPORTANT Use this function carefully, as it will do a hard replacement
-   * @param id The id
-   * @param newAddress The address to set
-   */
+  /// @inheritdoc ILendingPoolAddressesProvider
   function setAddress(bytes32 id, address newAddress) external override onlyOwner {
     _addresses[id] = newAddress;
     emit AddressSet(id, newAddress);
   }
 
-  /**
-   * @dev Returns an address by id
-   * @return The address
-   */
+  /// @inheritdoc ILendingPoolAddressesProvider
   function getAddress(bytes32 id) public view override returns (address) {
     return _addresses[id];
   }
 
-  /**
-   * @dev The functions below are getters/setters of addresses that are outside the context
-   * of the protocol hence the upgradable proxy pattern is not used
-   **/
-
+  /// @inheritdoc ILendingPoolAddressesProvider
   function getMainAdmin() external view override returns (address) {
     return getAddress(MAIN_ADMIN);
   }
 
+  /// @inheritdoc ILendingPoolAddressesProvider
   function setMainAdmin(address admin) external override onlyOwner {
     _addresses[MAIN_ADMIN] = admin;
     emit ConfigurationAdminUpdated(admin);
   }
 
+  /// @inheritdoc ILendingPoolAddressesProvider
   function getEmergencyAdmin() external view override returns (address) {
     return getAddress(EMERGENCY_ADMIN);
   }
 
+  /// @inheritdoc ILendingPoolAddressesProvider
   function setEmergencyAdmin(address emergencyAdmin) external override onlyOwner {
     _addresses[EMERGENCY_ADMIN] = emergencyAdmin;
     emit EmergencyAdminUpdated(emergencyAdmin);
   }
 
+  /// @inheritdoc ILendingPoolAddressesProvider
   function getPriceOracle() external view override returns (address) {
     return getAddress(PRICE_ORACLE);
   }
 
-  function setPriceOracle(address priceOracle) external override onlyOwner {
-    _addresses[PRICE_ORACLE] = priceOracle;
-    emit PriceOracleUpdated(priceOracle);
+  /// @inheritdoc ILendingPoolAddressesProvider
+  function setPriceOracle(address priceOracleAddress) external override onlyOwner {
+    _addresses[PRICE_ORACLE] = priceOracleAddress;
+    emit PriceOracleUpdated(priceOracleAddress);
   }
 
+  /// @inheritdoc ILendingPoolAddressesProvider
   function getSwapRouter() external view override returns (address) {
     return getAddress(SWAP_ROUTER);
   }
 
+  /// @inheritdoc ILendingPoolAddressesProvider
   function setSwapRouter(address swapRouter) external override onlyOwner {
     _addresses[SWAP_ROUTER] = swapRouter;
     emit SwapRouterUpdated(swapRouter);
